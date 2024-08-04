@@ -1,0 +1,273 @@
+menu "RFID Reader Config"
+
+    config EXAMPLE_ENABLE_WEB_ROUTER
+        bool "Open web configuration"
+        default y
+        help
+            Open the web router, you can configure the system parameters
+
+    config SYS_INFO_HARD_VERSION
+        string "system hardware version"
+        default "V1.0"
+        help
+            system hardware version
+
+    config SYS_INFO_SOFT_VERSION
+        string "system software version"
+        default "V1.0"
+        help
+            system hardware version
+
+    choice SYS_WORK_MODE
+        prompt "system work mode"
+        default SYS_WORK_MODE_READER
+        help
+            Select which kind of system work mode will be used in the Board.
+
+        config SYS_WORK_MODE_READER
+            bool "RFID Reader mode"
+            select RFID_READER_MODE
+            help
+                ha ha ha.
+
+        config SYS_WORK_MODE_GATEWAY
+            bool "Gateway mode"
+            select GATEWAY_MODE
+            help
+                ???.
+
+    endchoice
+
+    choice SYS_NET_COMMUNICATION_PROTOCOL
+        prompt "system networking communication protocol "
+        default SYS_NET_COMMUNICATION_PROTOCOL_MQTT
+        help
+            Select which kind of networking communication protocol
+
+        config SYS_NET_COMMUNICATION_PROTOCOL_MQTT
+            bool "MQTT protocol"
+            select MQTT_protocol
+            help
+                ha ha ha.
+
+        config SYS_NET_COMMUNICATION_PROTOCOL_TCP
+            bool "TCP protocol"
+            select GATEWAY_MODE
+            help
+                ???.
+    endchoice
+
+    config BROKER_URL
+        string "Broker URL"
+        default "mqtt://123.60.157.221"
+        help
+            URL of the broker to connect to
+
+    config TCP_ADDRESS
+        string "tcp address"
+        default "123.60.157.221"
+        help
+            ip address of the system to connect to
+
+    config TCP_PORT
+        int "tcp port"
+        default 4998
+        help
+            ip port of the system to connect to
+        
+
+    config EXAMPLE_ENABLE_ETHERNET
+        bool "enable ethernet configuration"
+        default y
+        help
+            enable ethernet, you can configure the system parameters
+
+    config EXAMPLE_ENABLE_4GMODULE
+        bool "enable 4G module configuration"
+        default y
+        help
+            enable 4G module, you can configure the system parameters
+
+    config EXAMPLE_WEB_MOUNT_POINT  
+        string "Website mount point in VFS"
+        default "/spiffs"
+        depends on EXAMPLE_ENABLE_WEB_ROUTER
+        help
+            Specify the mount point in VFS.
+
+    config EXAMPLE_WEB_USERNAME
+        string "Default login username"
+        default "root"
+        depends on EXAMPLE_ENABLE_WEB_ROUTER
+        help
+            Default username for logging in to the server.
+
+    config EXAMPLE_WEB_PASSWORD
+        string "Default login password"
+        default "admin"
+        depends on EXAMPLE_ENABLE_WEB_ROUTER
+        help
+            Default password for logging in to the server.
+
+    config EXAMPLE_ENTER_PPP_DURING_INIT
+        bool "Auto enter ppp mode"
+        default y
+        help
+            If not enable, just stay in command mode, user can call modem_board_ppp_start to enter network mode later
+
+    config EXAMPLE_AUTO_UPDATE_DNS
+        bool "Auto update Wi-Fi soft ap DNS address"
+        default y
+        help
+            If true using dns address got from ppp
+
+    config EXAMPLE_PING_NETWORK
+        bool "Ping network to check the state"
+        default y
+
+    config EXAMPLE_PING_MANUAL
+        bool "Ping manual address"
+        default y
+
+    config EXAMPLE_PING_MANUAL_ADDR
+        string "Manual address"
+        default "8.8.8.8"
+        depends on EXAMPLE_PING_MANUAL
+
+    config EXAMPLE_PING_TIMEOUT
+        int "ping timeout value (ms)"
+        default 2000
+        depends on EXAMPLE_PING_NETWORK
+
+    config DUMP_SYSTEM_STATUS
+        bool "Dump system task status"
+        default n
+        help
+            Dump system task status, stack left, cpu load, etc.
+
+    config LED_RUN_STATUS_GPIO
+        int "System run status led  gpio, set 0 if not use"
+        default 17
+    config LED_ALM_STATUS_GPIO
+        int "System alarm status led  gpio, set 0 if not use"
+        default 16
+    config LED_NET_STATUS_GPIO
+        int "System net status led gpio, set 0 if not use"
+        default 15
+    
+    config FAN_CTRL_GPIO
+        int "System net status led gpio, set 0 if not use"
+        default 3
+
+    
+    config EXAMPLE_USE_SPI_ETHERNET
+        bool "USE SPI Ethernet"
+        default y
+        select ETH_USE_SPI_ETHERNET
+        help
+            Use external SPI-Ethernet module(s).
+
+    if EXAMPLE_USE_SPI_ETHERNET
+
+        config EXAMPLE_SPI_ETHERNETS_NUM     
+            int "Number of SPI Ethernet modules to use at a time"
+            range 1 2
+            default 1
+            help
+                Set the number of SPI Ethernet modules you want to use at a time. Multiple SPI modules can be connected
+                to one SPI interface and can be separately accessed based on state of associated Chip Select (CS).
+
+        choice EXAMPLE_ETHERNET_TYPE_SPI
+            prompt "Ethernet SPI"
+            default EXAMPLE_USE_W5500
+            help
+                Select which kind of Ethernet will be used in the example.
+
+            config EXAMPLE_USE_DM9051
+                bool "DM9051 Module"
+                select ETH_SPI_ETHERNET_DM9051
+                help
+                    Select external SPI-Ethernet module (DM9051).
+
+            config EXAMPLE_USE_KSZ8851SNL
+                bool "KSZ8851SNL Module"
+                select ETH_SPI_ETHERNET_KSZ8851SNL
+                help
+                    Select external SPI-Ethernet module (KSZ8851SNL).
+
+            config EXAMPLE_USE_W5500
+                bool "W5500 Module"
+                select ETH_SPI_ETHERNET_W5500
+                help
+                    Select external SPI-Ethernet module (W5500).
+        endchoice
+
+        config EXAMPLE_ETH_SPI_HOST
+            int "SPI Host Number"
+            range 0 2
+            default 1
+            help
+                Set the SPI host used to communicate with the SPI Ethernet Controller.
+
+        config EXAMPLE_ETH_SPI_SCLK_GPIO
+            int "SPI SCLK GPIO number"
+            range 0 48
+            default 39
+            help
+                Set the GPIO number used by SPI SCLK.
+
+        config EXAMPLE_ETH_SPI_MOSI_GPIO
+            int "SPI MOSI GPIO number"
+            range 0 48
+            default 1
+            help
+                Set the GPIO number used by SPI MOSI.
+
+        config EXAMPLE_ETH_SPI_MISO_GPIO
+            int "SPI MISO GPIO number"
+            range 0 48
+            default 2
+            help
+                Set the GPIO number used by SPI MISO.
+
+        config EXAMPLE_ETH_SPI_CLOCK_MHZ
+            int "SPI clock speed (MHz)"
+            range 5 80
+            default 36
+            help
+                Set the clock speed (MHz) of SPI interface.
+
+        config EXAMPLE_ETH_SPI_CS0_GPIO
+            int "SPI CS0 GPIO number for SPI Ethernet module #1"
+            range 0 48
+            default 38
+            help
+                Set the GPIO number used by SPI CS0, i.e. Chip Select associated with the first SPI Eth module.
+
+        
+
+        config EXAMPLE_ETH_SPI_INT0_GPIO
+            int "Interrupt GPIO number SPI Ethernet module #1"
+            range 0 48
+            default 48
+            help
+                Set the GPIO number used by the first SPI Ethernet module interrupt line.
+
+        config EXAMPLE_ETH_SPI_PHY_RST0_GPIO
+            int "PHY Reset GPIO number of SPI Ethernet Module #1"
+            range -1 48
+            default 4
+            help
+                Set the GPIO number used to reset PHY chip on the first SPI Ethernet module.
+                Set to -1 to disable PHY chip hardware reset.
+        config EXAMPLE_ETH_SPI_PHY_ADDR0
+            int "PHY Address of SPI Ethernet Module #1"
+            range 0 31
+            default 1
+            help
+                Set the first SPI Ethernet module PHY address according your board schematic.
+
+    endif # EXAMPLE_USE_SPI_ETHERNET
+
+    
+endmenu
