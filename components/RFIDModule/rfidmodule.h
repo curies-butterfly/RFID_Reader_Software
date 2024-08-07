@@ -135,6 +135,7 @@ result_t RFID_ReadEPC(rfid_read_config_t rfid_read_config);
 void RFID_ReadEpcTask(void *arg);
 
 extern SemaphoreHandle_t xBinarySemaphore;
+extern SemaphoreHandle_t mqtt_xBinarySemaphore;
 extern SemaphoreHandle_t xBinarySemaphore_clear;
 
 #endif

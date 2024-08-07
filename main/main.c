@@ -169,6 +169,9 @@ void RFID_MqttTask(void *arg)
         // //将RFID模块读取到的天线号 温度值 信号强度 转为json
         // if(Ok==rfidready_flag)
         // {
+
+        if(xSemaphoreTake(mqtt_xBinarySemaphore, portMAX_DELAY)!= pdTRUE)
+            continue;
         mqtt_publish_epc_data();
         vTaskDelay(1000/portTICK_PERIOD_MS);
         // }
@@ -294,9 +297,6 @@ void app_main(void)
         // printf("tem:%.2f\thumt:%.2f\r\n", sht30_data.Temperature, sht30_data.Humidity);
         // mqtt_publish_epc_data();
 
-
-       
-     
         vTaskDelay(2000/portTICK_PERIOD_MS);
     }
 }

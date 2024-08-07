@@ -8,6 +8,7 @@ rfid_read_config_t rfid_dtu_read_config;
 QueueHandle_t   modBusRtuCmdQueue;     //成功接收到指令后，将指令帧发送到队列，等待modbusRTU指令处理任务处理
 uint8_t modbusRtuDataTAB[50][20];
 SemaphoreHandle_t xBinarySemaphore;//信号量创句柄
+SemaphoreHandle_t mqtt_xBinarySemaphore;//信号量创句柄
 
 float testvalu = 22.4;
 

@@ -453,6 +453,12 @@ void network_init(void)
 void mqtt_init(void)
 {
     mqtt_app_start();
+    mqtt_xBinarySemaphore = xSemaphoreCreateBinary();
+    if ( mqtt_xBinarySemaphore == NULL)
+    {
+        // printf("创建信号量失败\r\n");
+        return;
+    }
 }
 
 int mqtt_client_publish(const char *topic, const char *data, int len, int qos, int retain)

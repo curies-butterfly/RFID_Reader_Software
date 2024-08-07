@@ -537,7 +537,8 @@ void RFID_ShowEpc(EPC_Info_t  **EPC_ptr)
         printf("No:%d       EPCID:%x%x    antID:%d    Temp:%.2f\r\n",i+1,EPC_ptr[i]->epcId[0],EPC_ptr[i]->epcId[1],EPC_ptr[i]->antID,EPC_ptr[i]->tempe/100.0);
     }
 }
-extern SemaphoreHandle_t xBinarySemaphore;
+// extern SemaphoreHandle_t xBinarySemaphore;
+// extern SemaphoreHandle_t mqtt_xBinarySemaphore;
 //读EPC任务
 void RFID_ReadEpcTask(void *arg)
 {
@@ -591,7 +592,9 @@ void RFID_ReadEpcTask(void *arg)
             {
                 epc_read_speed = 0;
             }
-            xSemaphoreGive(xBinarySemaphore);//给予一次信息量
+            xSemaphoreGive(xBinarySemaphore);     //给予一次信息量
+            xSemaphoreGive(mqtt_xBinarySemaphore);//给予一次信息量
+            
         }
         vTaskDelay(200/portTICK_PERIOD_MS);
     }
