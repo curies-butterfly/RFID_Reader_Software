@@ -595,13 +595,13 @@ void OLEDDisplay_drawStringInternal(OLEDDisplay_t *oled, int16_t xMove, int16_t 
 
 
 void OLEDDisplay_drawString(OLEDDisplay_t *oled, int16_t xMove, int16_t yMove, char * strUser) {
-	printf("DEBUG MARK %d\n",__LINE__);
+	// printf("DEBUG MARK %d\n",__LINE__);
   uint16_t lineHeight = pgm_read_byte(oled->fontData + HEIGHT_POS);
 
   // char* text must be freed!
   char* text = strUser; //utf8 to ASCII MUST FREE BELOW IF USED
 
-	printf("DEBUG MARK %d\n",__LINE__);
+	// printf("DEBUG MARK %d\n",__LINE__);
   uint16_t yOffset = 0;
   // If the string should be centered vertically too
   // we need to now how heigh the string is.
@@ -614,18 +614,18 @@ void OLEDDisplay_drawString(OLEDDisplay_t *oled, int16_t xMove, int16_t yMove, c
     // Calculate center
     yOffset = (lb * lineHeight) / 2;
   }
-	printf("DEBUG MARK %d\n",__LINE__);
+	// printf("DEBUG MARK %d\n",__LINE__);
 
   uint16_t line = 0;
   char* textPart = strtok(text,"\n");
-	printf("DEBUG MARK %d\n",__LINE__);
+	// printf("DEBUG MARK %d\n",__LINE__);
   while (textPart != NULL) {
     uint16_t length = strlen(textPart);
-	printf("DEBUG MARK %d\n",__LINE__);
+	// printf("DEBUG MARK %d\n",__LINE__);
     OLEDDisplay_drawStringInternal(oled, xMove, yMove - yOffset + (line++) * lineHeight, textPart, length, OLEDDisplay_getStringWidthLen(oled, textPart, length));
     textPart = strtok(NULL, "\n");
   }
-	printf("DEBUG MARK %d\n",__LINE__);
+	// printf("DEBUG MARK %d\n",__LINE__);
   // NEED FOR UTF8 if used free(text);
 }
 
@@ -1251,3 +1251,8 @@ void OLEDDisplay_display(OLEDDisplay_t *oled) {
 		OLEDDisplay_sendPayload(oled,oled->buffer,oled->displayBufferSize);
 #endif
 }
+
+
+
+
+

@@ -39,8 +39,6 @@
 
 #include "driver/spi_master.h"
 
-
-
 #include "rfidnetwork.h"
 #include "httpconfig.h"
 #include "parameter.h"
@@ -49,6 +47,7 @@
 #include "dev_info.h"
 #include "OLEDDisplay.h"
 #include "oleddisplayfonts.h"
+#include "ntc_temp_adc.h"
 
 static const char *TAG = "rfid_reader";
 
@@ -62,8 +61,9 @@ WorkFreq_t WorkFreq;
 
 result_t rfidready_flag;//rfid初始化标志位
 
-
-char buffer[20];//oled显示  字符数组
+char oled_buffer[20];//oled显示  字符数组
+char oled_number[20];//oled显示  
+void oled_data_display(OLEDDisplay_t *oled);
 
 //RFID 模组初始化，显示和配置相关参数
 void rfidModuleInit()
@@ -181,7 +181,31 @@ void RFID_MqttTask(void *arg)
  
 }
 
+void oled_data_display(OLEDDisplay_t *oled){
+  //ID:########
+  //温度：38℃ 
+  //运行状态：正常/异常
 
+  
+  sprintf(oled_number, "%2d", temp);
+  OLEDDisplay_clear(oled);
+  //________________第一行ID_______________
+  OLEDDisplay_setTextAlignment(oled,TEXT_ALIGN_CENTER);
+  OLEDDisplay_setFont(oled,ArialMT_Plain_16);
+  sprintf(oled_buffer, "ID: %08lx", chip_id);
+  OLEDDisplay_drawString(oled,64, 0, oled_buffer);
+
+  //________________第二行温度_______________
+  OLEDDisplay_drawXbm(oled,1, 16,128,18,myBitmap1);
+  OLEDDisplay_setTextAlignment(oled,TEXT_ALIGN_LEFT);
+  OLEDDisplay_setFont(oled,ArialMT_Plain_16);
+  OLEDDisplay_drawString(oled,85, 16, oled_number);
+    
+  //________________第三行工作状态_______________
+  OLEDDisplay_drawXbm(oled,1, 32,128,18,myBitmap2);
+  OLEDDisplay_display(oled);
+  OLEDDisplay_flipScreenVertically(oled);//反转镜像
+}
 
 void app_main(void)
 {
@@ -237,9 +261,10 @@ void app_main(void)
     //RFID_SendReadEpcCmd(0x08,1);
     led_indicator_start(s_led_run_status_handle, BLINK_CONNECTING);
     
+    ntc_init();
 
     OLEDDisplay_t *oled = OLEDDisplay_init(I2C_NUM_1,0x78,I2C_MASTER_SDA_IO,I2C_MASTER_SCL_IO);
-    
+
     // char on_off[5] = "";
     // char read_mode[20] = "";
     // char ant_sel[4] = "";
@@ -267,21 +292,21 @@ void app_main(void)
     // OLEDDisplay_setTextAlignment(oled,TEXT_ALIGN_CENTER);
     // OLEDDisplay_setFont(oled,ArialMT_Plain_24);
     // OLEDDisplay_drawString(oled,64, 00, "HB RFID");
-    OLEDDisplay_drawXbm(oled,1, 1,128,48,myBitmap);
-    // OLEDDisplay_drawString(oled,64,00,(char *)charray);
-    // OLEDDisplay_flipScreenVertically(oled);//反转镜像
+    // OLEDDisplay_drawXbm(oled,1, 1,128,48,myBitmap);
+    // // OLEDDisplay_drawString(oled,64,00,(char *)charray);
+    // // OLEDDisplay_flipScreenVertically(oled);//反转镜像
   
-    OLEDDisplay_display(oled);
-    OLEDDisplay_setTextAlignment(oled,TEXT_ALIGN_CENTER);
-    OLEDDisplay_setFont(oled,ArialMT_Plain_16);
-    sprintf(buffer, "ID: %08lx", chip_id);
-    OLEDDisplay_drawString(oled,64, 48, buffer);
-    OLEDDisplay_display(oled);
-    OLEDDisplay_flipScreenVertically(oled);//反转镜像
+    // OLEDDisplay_display(oled);
+    // OLEDDisplay_setTextAlignment(oled,TEXT_ALIGN_CENTER);
+    // OLEDDisplay_setFont(oled,ArialMT_Plain_16);
+    // sprintf(buffer, "ID: %08lx", chip_id);
+    // OLEDDisplay_drawString(oled,64, 48, buffer);
+    // OLEDDisplay_display(oled);
+    // OLEDDisplay_flipScreenVertically(oled);//反转镜像
 
     fan_gpio_init();
-    fan_gpio_set(1);  // 点亮 LED
-    vTaskDelay(1000 / portTICK_PERIOD_MS); // 延迟 1 秒
+   
+    // vTaskDelay(1000 / portTICK_PERIOD_MS); // 延迟 1 秒
 
     while(1)
     {
@@ -296,7 +321,8 @@ void app_main(void)
         // mqtt_client_publish("rfid", json_str, size, 0, 1);
         // printf("tem:%.2f\thumt:%.2f\r\n", sht30_data.Temperature, sht30_data.Humidity);
         // mqtt_publish_epc_data();
-
+        ntc_temp_adc_run();
+        oled_data_display(oled);
         vTaskDelay(2000/portTICK_PERIOD_MS);
     }
 }
