@@ -20,6 +20,8 @@
 #include "usb/usb_helpers.h"
 #include "esp_private/usb_phy.h"
 #include "iot_usbh.h"
+#include "hal/wdt_hal.h"//watchdog
+
 
 #define ERR_CHECK(a, str, ret) if(!(a)) { \
         ESP_LOGE(TAG,"%s:%d (%s):%s", __FILE__, __LINE__, __FUNCTION__, str); \
@@ -754,6 +756,13 @@ iot_usbh_urb_handle_t iot_usbh_urb_ctrl_xfer(usbh_port_handle_t port_hdl, iot_us
 #ifdef CONFIG_USBH_GET_DEVICE_DESC
 static esp_err_t _usbh_get_dev_desc(usbh_pipe_handle_t pipe_handle, usb_device_desc_t *device_desc)
 {
+    wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
+    wdt_hal_write_protect_disable(&rwdt_ctx);
+    wdt_hal_feed(&rwdt_ctx);//4G初始化有点长，先喂一次狗
+
+
+
+
     ERR_CHECK(pipe_handle != NULL, "pipe_handle can't be NULL", ESP_ERR_INVALID_ARG);
     // malloc URB for default control
     urb_t *urb_ctrl = iot_usbh_urb_alloc(0, sizeof(usb_setup_packet_t) + CTRL_TRANSFER_DATA_MAX_BYTES, NULL);

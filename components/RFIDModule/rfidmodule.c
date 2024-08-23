@@ -2,7 +2,11 @@
 #include "string.h"
 #include "stdlib.h"
 #include "stdint.h"
- #include "freertos/semphr.h"//信号量头文件
+#include "freertos/semphr.h"//信号量头文件
+
+
+
+static const char *TAG = "RFID_Del";
 
 BaseDataFrame_t  UARTRecvFrame;
 EPC_Info_t  *LTU3_Lable[120] = {NULL};  //
@@ -540,6 +544,7 @@ void RFID_ShowEpc(EPC_Info_t  **EPC_ptr)
 // extern SemaphoreHandle_t xBinarySemaphore;
 // extern SemaphoreHandle_t mqtt_xBinarySemaphore;
 //读EPC任务
+int count2;
 void RFID_ReadEpcTask(void *arg)
 {
     BaseDataFrame_t  EPCFrame;
@@ -560,6 +565,13 @@ void RFID_ReadEpcTask(void *arg)
         {
             for(index = 0; index < 120; index++)
             {  
+
+                if(0== EPCFrame.pData[2] && 0 == EPCFrame.pData[3])
+                {
+                  break;
+                }
+
+
                 if(LTU3_Lable[index] == NULL)
                 {
                    epcCnt++;
@@ -583,10 +595,18 @@ void RFID_ReadEpcTask(void *arg)
                     break;
                 }
             }
-         
-            printf("%x%x:%.2f\r\n",EPCFrame.pData[2],EPCFrame.pData[3],((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0);
+
+
+            // count2++;
+            // printf("epcframe count:%d \n",count2);
+
+            ESP_LOGI(TAG,"%02x%02x:%.2f\r\n",EPCFrame.pData[2],EPCFrame.pData[3],(((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0));
+
             // printf("epcCnt:%d\r\n",epcCnt);
-            free(EPCFrame.pData); //释放EPC数据帧的数据存储地址
+            // free(EPCFrame.pData); //释放EPC数据帧的数据存储地址
+
+                // xSemaphoreGive(uart1_rx_xBinarySemaphore);//给予一次信息量
+
             epc_read_speed++;
             if(epc_read_speed > 800) 
             {
@@ -596,7 +616,7 @@ void RFID_ReadEpcTask(void *arg)
             xSemaphoreGive(mqtt_xBinarySemaphore);//给予一次信息量
             
         }
-        vTaskDelay(200/portTICK_PERIOD_MS);
+        vTaskDelay(100/portTICK_PERIOD_MS);
     }
 }
 

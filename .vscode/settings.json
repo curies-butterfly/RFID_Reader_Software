@@ -56,7 +56,9 @@
         "httpconfig.h": "c",
         "led.h": "c",
         "oleddisplayfonts.h": "c",
-        "ntc_temp_adc.h": "c"
+        "ntc_temp_adc.h": "c",
+        "rfidnetwork.h": "c",
+        "parameter.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "idf.portWin": "COM54",

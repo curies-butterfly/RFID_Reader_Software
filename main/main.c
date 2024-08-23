@@ -48,7 +48,7 @@
 #include "OLEDDisplay.h"
 #include "oleddisplayfonts.h"
 #include "ntc_temp_adc.h"
-
+#include "hal/wdt_hal.h"
 static const char *TAG = "rfid_reader";
 
 void RFID_MqttTask(void *arg);
@@ -64,6 +64,12 @@ result_t rfidready_flag;//rfid初始化标志位
 char oled_buffer[20];//oled显示  字符数组
 char oled_number[20];//oled显示  
 void oled_data_display(OLEDDisplay_t *oled);
+
+/*      相关配置         */
+char *strcop="mqtt://123.60.157.221";
+
+
+/*      end             */
 
 //RFID 模组初始化，显示和配置相关参数
 void rfidModuleInit()
@@ -136,7 +142,7 @@ void mqtt_publish_epc_data()
         if(EPC_ptr[i] == NULL)
             break;
         memset(one_epc_data,0,sizeof(one_epc_data));
-        sprintf(one_epc_data,"{\"epc\":\"%x%x\",\"tem\":%.2f,\"ant\":%d,\"rssi\":%d}",              \
+        sprintf(one_epc_data,"{\"epc\":\"%02x%02x\",\"tem\":%.2f,\"ant\":%d,\"rssi\":%d}",              \
         EPC_ptr[i]->epcId[0],EPC_ptr[i]->epcId[1],EPC_ptr[i]->tempe/100.0,EPC_ptr[i]->antID,EPC_ptr[i]->rssi); 
         strcat(epc_data,one_epc_data);
         strcat(epc_data,",");
@@ -207,20 +213,40 @@ void oled_data_display(OLEDDisplay_t *oled){
   OLEDDisplay_flipScreenVertically(oled);//反转镜像
 }
 
+
 void app_main(void)
 {
     get_chip_IDinfo();//打印芯片信息
-
-
+    wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
+    wdt_hal_write_protect_disable(&rwdt_ctx);
+    wdt_hal_feed(&rwdt_ctx);//4G初始化有点长，先喂一次狗
     /* Initialize led indicator */
     _led_indicator_init();
 
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        //若由于分区版本更新或无可用页(存储空间不足)，尝试格式化并重新初始化
         /* NVS partition was truncated and needs to be erased
          * Retry nvs_flash_init */
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
+    }
+
+    //nvs写入操作
+    nvs_handle_t my_handle;//nvs句柄
+    ret=nvs_open("storage",NVS_READWRITE,&my_handle);
+    if(ret!=ESP_OK){
+        ESP_LOGE(TAG,"nvs_open error");
+    }else{
+        //写入数据
+        ret = nvs_set_str(my_handle,"mqtt_address",strcop);
+        if(ret!=ESP_OK){
+            ESP_LOGE(TAG,"nvs_set_str error");
+        }else{
+            ret=nvs_commit(my_handle);//提交数据
+            ESP_LOGI(TAG,"nvs_set_str success");
+        }
+        nvs_close(my_handle);//关闭nvs句柄
     }
 
     /* Initialize default TCP/IP stack */
@@ -233,15 +259,17 @@ void app_main(void)
     get_nvs_sys_info_config();
     
     //from_nvs_set_value 目前没有加nvs写操作，只有读取nvs中的数据
-    char strcop[]="mqtt://123.60.157.221";
-    strcpy(sys_info_config.mqtt_address, strcop);
+    // char strcop[]="mqtt://123.60.157.221";
+    // strcpy(sys_info_config.mqtt_address, strcop);
+    ESP_LOGI(TAG,"MQTT_ADDRESS: %s",sys_info_config.mqtt_address);
+
     // sys_info_config.mqtt_address="mqtt://123.60.157.221";
     // sys_info_config.tcp_address="123.60.157.221";
     // sys_info_config.tcp_port=1883;
 
     network_init();
+    wdt_hal_feed(&rwdt_ctx);//4G初始化有点长，先喂一次狗
     mqtt_init();
-
     rfid_http_init(s_modem_wifi_config);
 
     uart1_Init();
@@ -264,7 +292,7 @@ void app_main(void)
     ntc_init();
 
     OLEDDisplay_t *oled = OLEDDisplay_init(I2C_NUM_1,0x78,I2C_MASTER_SDA_IO,I2C_MASTER_SCL_IO);
-
+   
     // char on_off[5] = "";
     // char read_mode[20] = "";
     // char ant_sel[4] = "";
@@ -305,11 +333,12 @@ void app_main(void)
     // OLEDDisplay_flipScreenVertically(oled);//反转镜像
 
     fan_gpio_init();
-   
+    // xSemaphoreGive(uart1_rx_xBinarySemaphore);//给予一次信息量
     // vTaskDelay(1000 / portTICK_PERIOD_MS); // 延迟 1 秒
-
+    
     while(1)
     {
+        wdt_hal_feed(&rwdt_ctx);
         printf("free heap size: %d\r\n",xPortGetFreeHeapSize());
         // RFID_ShowEpc(LTU3_Lable);
         // SHT30_read_result(0x44, &sht30_data);

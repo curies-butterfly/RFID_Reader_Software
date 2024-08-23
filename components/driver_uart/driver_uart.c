@@ -12,6 +12,10 @@ QueueHandle_t   RFID_EpcQueue;  //用于同步串口数据处理任务后，给R
 #define U2_TXD_PIN 21//(GPIO_NUM_19)
 #define U2_RXD_PIN 47//(GPIO_NUM_5)
 
+// SemaphoreHandle_t uart1_rx_xBinarySemaphore;//信号量创句柄
+#define MAX_DATA_LEN 10000
+uint8_t UARTRecvFrame_pData[MAX_DATA_LEN+ 2];
+
 void uart1_Init(void)
 {
     const uart_config_t uart_config = 
@@ -27,7 +31,14 @@ void uart1_Init(void)
     uart_driver_install(UART_NUM_1, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
     uart_param_config(UART_NUM_1, &uart_config);
     uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    RFID_EpcQueue = xQueueCreate( 20, sizeof( BaseDataFrame_t ) );
+    RFID_EpcQueue = xQueueCreate(20, sizeof( BaseDataFrame_t ) );
+
+    // uart1_rx_xBinarySemaphore = xSemaphoreCreateBinary();
+    // if ( mqtt_xBinarySemaphore == NULL)
+    // {
+    //     // printf("创建信号量失败\r\n");
+    //     return;
+    // }
 }
 
 
@@ -77,7 +88,7 @@ int uart2_SendStr(char* data)
     return txBytes;
 }
 
-
+int count1;
 //Bug 需要考虑数据越界问题，i定位到帧头0x5A的位置后，i后面不一定有数据
 void rx_task(void *arg)
 {
@@ -117,6 +128,7 @@ void rx_task(void *arg)
                     //如果是一帧正确的数据，那么data[i+3]则是协议控制字的第3个Byte，data[i+3]&0x20是协议控制字的Bit 13
                     //如果Bit 13为RS485 标志位，当为1时才有串行设备地址
                     //这里并没有先判断数据的正确性，因为必须要先确定数据的长度后才能作CRC校验。
+
                     if(data[i+3]&0x20)  
                     {   
                         UARTRecvFrame.DevAddr = data[i+5]; //有设备地址
@@ -144,11 +156,16 @@ void rx_task(void *arg)
                         if(UARTRecvFrame.ProCtrl[2]&0x10 && UARTRecvFrame.ProCtrl[3]==0x00) //读EPC数据帧
                         {
                             //为保证数据不丢失，为数据开放新的空间存储,EPC数据处理任务处理完后将会把空间free
-                            UARTRecvFrame.pData = (uint8_t*)malloc(sizeof(uint8_t)*UARTRecvFrame.DataLen + 2);
+                            // while(xSemaphoreTake(uart1_rx_xBinarySemaphore, portMAX_DELAY)!= pdTRUE);
+                        
+                            // UARTRecvFrame.pData = (uint8_t*)malloc(sizeof(uint8_t)*UARTRecvFrame.DataLen + 2);
+                            UARTRecvFrame.pData = UARTRecvFrame_pData;
                             memcpy(UARTRecvFrame.pData,&data[i+frameLen-UARTRecvFrame.DataLen+1],UARTRecvFrame.DataLen);
                             
                             if(RFID_EpcQueue != 0) //将EPC数据帧，发送到EPC数据帧队列
                             {
+                                // count1++;
+                                // printf("EPC_Queue_Count:%d\n",count1);
                                 xQueueGenericSend( RFID_EpcQueue, ( void * ) &UARTRecvFrame, ( TickType_t ) 0, queueSEND_TO_BACK );   
                             }  
                         }

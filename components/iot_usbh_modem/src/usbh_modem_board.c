@@ -21,6 +21,7 @@
 #include "esp_modem_dce.h"
 #include "esp_modem_dce_common_commands.h"
 #include "usbh_modem_board.h"
+#include "hal/wdt_hal.h"//watchdog
 
 static const char *TAG = "modem_board";
 ESP_EVENT_DEFINE_BASE(MODEM_BOARD_EVENT);
@@ -398,7 +399,6 @@ static bool _ppp_network_stop(esp_modem_dte_t *dte)
     }
     return false;
 }
-
 static void _modem_daemon_task(void *param)
 {
     modem_config_t *config = (modem_config_t *)param;
@@ -406,6 +406,9 @@ static void _modem_daemon_task(void *param)
     if ((config->flags & MODEM_FLAGS_INIT_NOT_FORCE_RESET) == 0) {
         modem_board_force_reset();
     }
+    wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
+    wdt_hal_write_protect_disable(&rwdt_ctx);
+    wdt_hal_feed(&rwdt_ctx);//4G初始化有点长，先喂一次狗
     // init the USB DTE
     esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
     dte_config.rx_buffer_size = config->rx_buffer_size; //rx ringbuffer for usb transfer
@@ -534,6 +537,10 @@ static void _modem_daemon_task(void *param)
         }
 
         /************************************ Processing stage **********************************/
+        wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
+        wdt_hal_write_protect_disable(&rwdt_ctx);
+        wdt_hal_feed(&rwdt_ctx);//4G初始化有点长，先喂一次狗
+        
         if (modem_stage != STAGE_WAITING) {
             ESP_LOGI(TAG, "Modem state %s, Start", stare_str);
         }
