@@ -12,11 +12,12 @@ QueueHandle_t   RFID_EpcQueue;  //用于同步串口数据处理任务后，给R
 #define U2_TXD_PIN 21//(GPIO_NUM_19)
 #define U2_RXD_PIN 47//(GPIO_NUM_5)
 
-// SemaphoreHandle_t uart1_rx_xBinarySemaphore;//信号量创句柄
+
 #define MAX_DATA_LEN 10000
 uint8_t UARTRecvFrame_pData[MAX_DATA_LEN+ 2];
 
-void uart1_Init(void)
+
+void uart1_Init(void)//RFID
 {
     const uart_config_t uart_config = 
     {
@@ -33,16 +34,10 @@ void uart1_Init(void)
     uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     RFID_EpcQueue = xQueueCreate(20, sizeof( BaseDataFrame_t ) );
 
-    // uart1_rx_xBinarySemaphore = xSemaphoreCreateBinary();
-    // if ( mqtt_xBinarySemaphore == NULL)
-    // {
-    //     // printf("创建信号量失败\r\n");
-    //     return;
-    // }
 }
 
 
-void uart2_Init(void)
+void uart2_Init(void)//485
 {
     const uart_config_t uart_config = 
     {
@@ -98,10 +93,14 @@ void rx_task(void *arg)
     uint8_t* data = (uint8_t*) malloc(RX_BUF_SIZE+1);
     uint16_t frameLen = 0;
     uint16_t CRC_val = 0;
+
+    // CircularQueue uartQueue;
+    // initQueue(&uartQueue);
+
     while (1) 
     {
         const int rxBytes = uart_read_bytes(UART_NUM_1, data, RX_BUF_SIZE, 200 / portTICK_PERIOD_MS);
-        //200 / portTICK_PERIOD_MS,这里表示接收数据等待时间，越小接收的响应速度就越好
+        // 200 / portTICK_PERIOD_MS,这里表示接收数据等待时间，越小接收的响应速度就越好
         int i = 0;
         if (rxBytes > 0) 
         {
@@ -158,8 +157,8 @@ void rx_task(void *arg)
                             //为保证数据不丢失，为数据开放新的空间存储,EPC数据处理任务处理完后将会把空间free
                             // while(xSemaphoreTake(uart1_rx_xBinarySemaphore, portMAX_DELAY)!= pdTRUE);
                         
-                            // UARTRecvFrame.pData = (uint8_t*)malloc(sizeof(uint8_t)*UARTRecvFrame.DataLen + 2);
-                            UARTRecvFrame.pData = UARTRecvFrame_pData;
+                            UARTRecvFrame.pData = (uint8_t*)malloc(sizeof(uint8_t)*UARTRecvFrame.DataLen + 2);
+                            // UARTRecvFrame.pData = UARTRecvFrame_pData;
                             memcpy(UARTRecvFrame.pData,&data[i+frameLen-UARTRecvFrame.DataLen+1],UARTRecvFrame.DataLen);
                             
                             if(RFID_EpcQueue != 0) //将EPC数据帧，发送到EPC数据帧队列

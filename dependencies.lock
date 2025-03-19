@@ -19,15 +19,15 @@ dependencies:
   iot_usbh:
     component_hash: null
     source:
-      path: D:\ESP32_IDF\rfid-reader-firmware\components\iot_usbh
+      path: D:\ESP32_IDF\rfid-reader-firmware-jsrg\components\iot_usbh
       type: local
     version: 0.2.1
   iot_usbh_cdc:
     component_hash: null
     source:
-      path: D:\ESP32_IDF\rfid-reader-firmware\components\iot_usbh_cdc
+      path: D:\ESP32_IDF\rfid-reader-firmware-jsrg\components\iot_usbh_cdc
       type: local
     version: 0.2.1
-manifest_hash: f4261c5fe6ca6d41bf9d519bf2716160e6d85588153b65ac7fbfaeaf1944ef68
+manifest_hash: 768198563af29e8b0a16c72e16a7e125bbc52004a1a169f638107a3f6c627439
 target: esp32s3
 version: 1.0.0

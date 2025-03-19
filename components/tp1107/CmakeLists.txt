@@ -1,6 +1,6 @@
-set(bsp_src "rfidmodule.c" )
+set(bsp_src "tp1107.c")
 
-set(requires "driver_uart" "COMMON" "RS485" "main")
+set(requires "chry_ringbuffer" "driver")
 
 idf_component_register(
     SRCS ${bsp_src}

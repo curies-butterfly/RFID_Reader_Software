@@ -22,9 +22,13 @@
 #include "esp_modem_dce_common_commands.h"
 #include "usbh_modem_board.h"
 #include "hal/wdt_hal.h"//watchdog
+#include "rfidnetwork.h"
 
 static const char *TAG = "modem_board";
 ESP_EVENT_DEFINE_BASE(MODEM_BOARD_EVENT);
+
+static const int MODEM_TASK_EXIT_BIT = BIT9;  // 新增标志位
+
 
 #define MODEM_CHECK_GOTO(a, str, goto_tag, ...)                                       \
         if (!(a))                                                                     \
@@ -259,6 +263,9 @@ static esp_modem_dce_t *modem_board_create(esp_modem_dce_config_t *config)
     // /* reset sequence (typical values for modem reser, Treset=200ms, wait 5s after reset */
     if (MODEM_RESET_GPIO) board->reset_pin = esp_modem_recov_gpio_new(MODEM_RESET_GPIO, MODEM_RESET_GPIO_INACTIVE_LEVEL,
                 MODEM_RESET_GPIO_ACTIVE_MS, MODEM_RESET_GPIO_INACTIVE_MS);
+
+    s_dce = &board->parent;  // 关键修改
+
     board->reset = modem_board_reset;
     board->power_up = modem_board_power_up;
     board->power_down = modem_board_power_down;
@@ -334,6 +341,11 @@ static void _usb_dte_disconn_callback(void *arg)
 
 static bool _check_sim_card()
 {
+    if (s_dce == NULL) {
+        ESP_LOGE(TAG, "DCE not initialized, cannot check SIM card");
+        return false;
+    }
+
     int if_ready = false;
     if (modem_board_get_sim_cart_state(&if_ready) == ESP_OK) {
         if (if_ready == true) {
@@ -399,17 +411,24 @@ static bool _ppp_network_stop(esp_modem_dte_t *dte)
     }
     return false;
 }
+
+
+int count_err=0;
 static void _modem_daemon_task(void *param)
 {
     modem_config_t *config = (modem_config_t *)param;
     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+    //强制复位 如果需要
     if ((config->flags & MODEM_FLAGS_INIT_NOT_FORCE_RESET) == 0) {
         modem_board_force_reset();
     }
+
     wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
     wdt_hal_write_protect_disable(&rwdt_ctx);
     wdt_hal_feed(&rwdt_ctx);//4G初始化有点长，先喂一次狗
     // init the USB DTE
+
     esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
     dte_config.rx_buffer_size = config->rx_buffer_size; //rx ringbuffer for usb transfer
     dte_config.tx_buffer_size = config->tx_buffer_size; //tx ringbuffer for usb transfer
@@ -418,6 +437,7 @@ static void _modem_daemon_task(void *param)
     dte_config.event_task_priority = config->event_task_priority; //task to handle usb rx data
     dte_config.conn_callback = _usb_dte_conn_callback;
     dte_config.disconn_callback = _usb_dte_disconn_callback;
+
     esp_modem_dce_config_t dce_config = ESP_MODEM_DCE_DEFAULT_CONFIG(CONFIG_MODEM_PPP_APN);
     esp_netif_config_t ppp_netif_config = ESP_NETIF_DEFAULT_PPP();
 
@@ -428,9 +448,26 @@ static void _modem_daemon_task(void *param)
     assert(dce != NULL);
     esp_netif_t *ppp_netif = esp_netif_new(&ppp_netif_config);
     assert(ppp_netif != NULL);
+
     /* attach driver to ppp interface, start DTE handling */
     s_dce = dce;
     ESP_ERROR_CHECK(esp_modem_default_attach(dte, dce, ppp_netif));
+
+    // 检查 SIM 卡状态
+    if (!_check_sim_card()) {
+        ESP_LOGE(TAG, "SIM card not detected or invalid, exiting modem daemon task!");
+        esp_event_post(MODEM_BOARD_EVENT, MODEM_EVENT_SIMCARD_DISCONN, NULL, 0, 0);
+        
+        // 设置任务退出标志，并清理资源
+        xEventGroupSetBits(s_modem_evt_hdl, MODEM_TASK_EXIT_BIT); 
+      
+        if (dce) dce->deinit(dce);
+        if (ppp_netif) esp_netif_destroy(ppp_netif);
+        
+        vTaskDelete(NULL);  // 直接退出任务
+        return;
+    }
+
     ESP_ERROR_CHECK(esp_modem_set_event_handler(dte, on_modem_event, ESP_EVENT_ANY_ID, NULL));
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, on_modem_event, NULL));
     if (config->handler) {
@@ -588,6 +625,7 @@ static void _modem_daemon_task(void *param)
             if (_check_sim_card() != true) {
                 retry_after_ms = 3000;
                 ++stage_retry_times;
+                count_err++;
             } else {
                 modem_stage = STAGE_CHECK_SIGNAL;
                 goto _stage_succeed;
@@ -649,7 +687,19 @@ _stage_succeed:
             vTaskDelay(pdMS_TO_TICKS(100));
             break;
         }
+
+        // if (count_err>=3){
+        //     break;
+        // }
+
     }
+
+  
+    wdt_hal_write_protect_disable(&rwdt_ctx);
+    wdt_hal_feed(&rwdt_ctx);
+    // 任务正常退出时也设置标志
+    xEventGroupSetBits(s_modem_evt_hdl, MODEM_TASK_EXIT_BIT);  //
+
     xEventGroupClearBits(s_modem_evt_hdl, ( PPP_NET_MODE_ON_BIT | PPP_NET_MODE_OFF_BIT | MODEM_DESTROY_BIT | DTE_USB_RECONNECT_BIT | PPP_NET_RECONNECTING_BIT));
     ESP_LOGI(TAG, "Modem Daemon Task Deleted!");
     vTaskDelete(NULL);
@@ -664,19 +714,50 @@ esp_err_t modem_board_init(modem_config_t *config)
     MODEM_CHECK(config != NULL && config->event_task_priority > CONFIG_USBH_TASK_BASE_PRIORITY, "Task priority must > USB", ESP_ERR_INVALID_ARG);
     s_modem_evt_hdl = xEventGroupCreate();
     assert(s_modem_evt_hdl != NULL);
+
     // if set not enter ppp mode, daemon task will suspend
     if (config->flags & MODEM_FLAGS_INIT_NOT_ENTER_PPP) {
         modem_board_ppp_auto_connect(false);
     }
+
     /* Create Modem Daemon task */
     TaskHandle_t daemon_task_handle = NULL;
     xTaskCreate (_modem_daemon_task, "modem_daemon", config->event_task_stack_size, config, config->event_task_priority, &daemon_task_handle);
     assert(daemon_task_handle != NULL);
     xTaskNotifyGive(daemon_task_handle);
+
+    // // if(sim_card_connected != true){
+    // //    return ESP_FAIL; 
+    // // }
+
+    // // If auto enter ppp and block until ppp got ip
+    // if (((config->flags & MODEM_FLAGS_INIT_NOT_ENTER_PPP) == 0) && ((config->flags & MODEM_FLAGS_INIT_NOT_BLOCK) == 0)) {
+    //     xEventGroupWaitBits(s_modem_evt_hdl, PPP_NET_CONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+    // }
+    // ESP_LOGI(TAG, "5555555555555555555555555555555555!");
+
     // If auto enter ppp and block until ppp got ip
     if (((config->flags & MODEM_FLAGS_INIT_NOT_ENTER_PPP) == 0) && ((config->flags & MODEM_FLAGS_INIT_NOT_BLOCK) == 0)) {
-        xEventGroupWaitBits(s_modem_evt_hdl, PPP_NET_CONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+        // 等待两个事件：PPP连接成功 或 任务异常退出
+        EventBits_t bits = xEventGroupWaitBits(
+            s_modem_evt_hdl,
+            PPP_NET_CONNECT_BIT | MODEM_TASK_EXIT_BIT,  // 同时等待两个标志
+            pdFALSE,  // 不自动清除标志
+            pdFALSE,  // 不需要同时满足两个标志
+            portMAX_DELAY
+        );
+        // 检查事件触发结果
+        if (bits & MODEM_TASK_EXIT_BIT) {
+            ESP_LOGE(TAG, "Modem daemon task exited abnormally!");
+            return ESP_FAIL;  // 返回失败，避免阻塞
+        } else if (bits & PPP_NET_CONNECT_BIT) {
+            ESP_LOGI(TAG, "PPP connected successfully!");
+        } else {
+            ESP_LOGE(TAG, "Unknown event bits: 0x%x", (unsigned int)bits);
+            return ESP_FAIL;
+        }
     }
+
     return ESP_OK;
 }
 

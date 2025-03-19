@@ -58,7 +58,17 @@
         "oleddisplayfonts.h": "c",
         "ntc_temp_adc.h": "c",
         "rfidnetwork.h": "c",
-        "parameter.h": "c"
+        "parameter.h": "c",
+        "esp_spi_flash.h": "c",
+        "stdbool.h": "c",
+        "semphr.h": "c",
+        "wdt_hal.h": "c",
+        "set": "c",
+        "format": "c",
+        "math.h": "c",
+        "string_view": "c",
+        "span": "c",
+        "chry_ringbuffer.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "idf.portWin": "COM54",

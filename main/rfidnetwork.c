@@ -30,11 +30,22 @@
 
 #include "json_parser.h"
 #include "rfidmodule.h"
+#include <cJSON.h>  // 包含 cJSON 库以生成 JSON 格式的消息
+
+#include "hal/wdt_hal.h"//watchdog
+
 
 static const char *TAG = "rfid_network";
 static const char *TAG_4G = "network_4G_module";
 static const char *TAG_ETHERNET = "network_ethernet";
 static const char *TAG_MQTT = "mqtt";
+
+
+// 定义全局变量以确保生命周期
+static char *lwt_msg = NULL;
+
+int pushtime_count = 10000;//默认600s 10min
+int err_value = 3;//默认3
 
 #define INIT_SPI_ETH_MODULE_CONFIG(eth_module_config, num)                                      \
     do {                                                                                        \
@@ -103,16 +114,21 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
     ESP_LOGI(TAG_ETHERNET, "~~~~~~~~~~~");
 }
 
-
+bool sim_card_connected = false;//全局变量来记录 SIM 卡的状态（是否插入）
 static void on_modem_event(void *arg, esp_event_base_t event_base,
                            int32_t event_id, void *event_data)
 {
+    // wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
+    // wdt_hal_write_protect_disable(&rwdt_ctx);
+    // wdt_hal_feed(&rwdt_ctx);
     if (event_base == MODEM_BOARD_EVENT) {
         if ( event_id == MODEM_EVENT_SIMCARD_DISCONN) {
             ESP_LOGW(TAG_4G, "Modem Board Event: SIM Card disconnected");
+            sim_card_connected = false;//没有插入
             //led_indicator_start(s_led_system_handle, BLINK_CONNECTED);
         } else if ( event_id == MODEM_EVENT_SIMCARD_CONN) {
             ESP_LOGI(TAG_4G, "Modem Board Event: SIM Card Connected");
+            sim_card_connected = true;//sim卡已插入
             //led_indicator_stop(s_led_system_handle, BLINK_CONNECTED);
         } else if ( event_id == MODEM_EVENT_DTE_DISCONN) {
             ESP_LOGW(TAG_4G, "Modem Board Event: USB disconnected");
@@ -141,6 +157,9 @@ static void on_modem_event(void *arg, esp_event_base_t event_base,
             //led_indicator_stop(s_led_wifi_handle, BLINK_CONNECTED);
         }
     }
+
+
+    // modem_board_init(&modem_config);
 }
 
 
@@ -163,10 +182,30 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG_MQTT, "MQTT_EVENT_CONNECTED");
-        msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 0);
-        ESP_LOGI(TAG_MQTT, "sent publish successful, msg_id=%d", msg_id);
+
+        // msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 0);
+         // 创建 JSON 对象
+        cJSON *json = cJSON_CreateObject();
+        cJSON_AddStringToObject(json, "id", lwt_content);
+        // // cJSON_AddStringToObject(json, "status", "online");
+
+        // // 将 JSON 对象转换为字符串
+        char *json_string = cJSON_PrintUnformatted(json);
+
+        // // 发布 JSON 消息
+        esp_mqtt_client_publish(event->client, "devices/status/connect", json_string, 0, 1, true);
+
+        // // 释放 JSON 对象
+        cJSON_Delete(json);
+        free(json_string);
+        
+
+        // ESP_LOGI(TAG_MQTT, "sent publish successful, msg_id=%d", msg_id);
 
         msg_id = esp_mqtt_client_subscribe(client, "ctlrfid", 0);//订阅一个控制读写器的主题
+        ESP_LOGI(TAG_MQTT, "sent subscribe successful, msg_id=%d", msg_id);
+
+        msg_id = esp_mqtt_client_subscribe(client, "pushtime", 0);//订阅一个控制读写器发布时间的主题
         ESP_LOGI(TAG_MQTT, "sent subscribe successful, msg_id=%d", msg_id);
         break;
     case MQTT_EVENT_DISCONNECTED:
@@ -189,89 +228,128 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
         printf("DATA=%.*s\r\n", event->data_len, event->data);
 
+        if (strncmp(event->topic, "ctlrfid", event->topic_len) == 0) {
 
+            // 解析JSON数据
+            char on_off[5] = "";
+            char read_mode[20] = "";
+            char ant_sel[4] = "";
+            char interval_time[5] = "";
+            char buf[512] = { 0 };
+            rfid_read_config_t rfid_read_config;
 
-        // 解析JSON数据
-        char on_off[5] = "";
-        char read_mode[20] = "";
-        char ant_sel[4] = "";
-        char interval_time[5] = "";
-        char buf[512] = { 0 };
-        rfid_read_config_t rfid_read_config;
-
-        if (strncmp(event->topic, "ctlrfid", event->topic_len) != 0) {
-            // 处理 ctlrfid 的消息
-            break;
-        } 
-
-        // // 判断数据是否是 JSON 格式
-        if (is_json_data(event->data, event->data_len)) {
             
-            ESP_LOGI(TAG, "Valid JSON data received");
-            // 使用 json_parse_message 函数解析 JSON 消息
-            // json_parse_message(event->data, event->data_len);
-        } else {
-            ESP_LOGI(TAG, "Received data is not in JSON format");
-            break;
-        }
-        
 
-        jparse_ctx_t jctx;
-        int ps_ret = json_parse_start(&jctx, event->data, event->data_len);
-        char str_val[64];
-        if (json_obj_get_string(&jctx, "on_off", str_val, sizeof(str_val)) == OS_SUCCESS) {
-            snprintf(on_off, sizeof(on_off), "%.*s", sizeof(on_off) - 1, str_val);
-            ESP_LOGI(TAG, "rfid read control: %s\n", on_off);
-        } else {
-            // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
-            // return ESP_FAIL;
-        }
-        if (json_obj_get_string(&jctx, "read_mode", str_val, sizeof(str_val)) == OS_SUCCESS) {
-            snprintf(read_mode, sizeof(read_mode), "%.*s", sizeof(read_mode) - 1, str_val);
-            ESP_LOGI(TAG, "rfid read mode: %s\n", read_mode);
-        } else {
-            // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
-            // return ESP_FAIL;
-        }
-        if (json_obj_get_string(&jctx, "ant_sel", str_val, sizeof(str_val)) == OS_SUCCESS) {
-            snprintf(ant_sel, sizeof(ant_sel), "%.*s", sizeof(ant_sel) - 1, str_val);
-            ESP_LOGI(TAG, "rfid read ant: %s\n", ant_sel);
-        } else {
-            // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
-            // return ESP_FAIL;
-        }
-        if (json_obj_get_string(&jctx, "interval_time", str_val, sizeof(str_val)) == OS_SUCCESS) {
-            snprintf(interval_time, sizeof(interval_time), "%.*s", sizeof(interval_time) - 1, str_val);
-            ESP_LOGI(TAG, "rfid read interval time: %s\n", interval_time);
-        } else {
-            // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
-            // return ESP_FAIL;
+            // // 判断数据是否是 JSON 格式
+            if (is_json_data(event->data, event->data_len)) {
+                
+                ESP_LOGI(TAG, "Valid JSON data received");
+                // 使用 json_parse_message 函数解析 JSON 消息
+                // json_parse_message(event->data, event->data_len);
+            } else {
+                ESP_LOGI(TAG, "Received data is not in JSON format");
+                break;
+            }
+            
+
+            jparse_ctx_t jctx;
+            int ps_ret = json_parse_start(&jctx, event->data, event->data_len);
+            char str_val[64];
+            if (json_obj_get_string(&jctx, "on_off", str_val, sizeof(str_val)) == OS_SUCCESS) {
+                snprintf(on_off, sizeof(on_off), "%.*s", sizeof(on_off) - 1, str_val);
+                ESP_LOGI(TAG, "rfid read control: %s\n", on_off);
+            } else {
+                // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
+                // return ESP_FAIL;
+            }
+            if (json_obj_get_string(&jctx, "read_mode", str_val, sizeof(str_val)) == OS_SUCCESS) {
+                snprintf(read_mode, sizeof(read_mode), "%.*s", sizeof(read_mode) - 1, str_val);
+                ESP_LOGI(TAG, "rfid read mode: %s\n", read_mode);
+            } else {
+                // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
+                // return ESP_FAIL;
+            }
+            if (json_obj_get_string(&jctx, "ant_sel", str_val, sizeof(str_val)) == OS_SUCCESS) {
+                snprintf(ant_sel, sizeof(ant_sel), "%.*s", sizeof(ant_sel) - 1, str_val);
+                ESP_LOGI(TAG, "rfid read ant: %s\n", ant_sel);
+            } else {
+                // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
+                // return ESP_FAIL;
+            }
+            if (json_obj_get_string(&jctx, "interval_time", str_val, sizeof(str_val)) == OS_SUCCESS) {
+                snprintf(interval_time, sizeof(interval_time), "%.*s", sizeof(interval_time) - 1, str_val);
+                ESP_LOGI(TAG, "rfid read interval time: %s\n", interval_time);
+            } else {
+                // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
+                // return ESP_FAIL;
+            }
+
+            if(!strcmp(on_off, "on"))
+                rfid_read_config.rfid_read_on_off = RFID_READ_ON;
+            else if(!strcmp(on_off, "off"))
+                rfid_read_config.rfid_read_on_off = RFID_READ_OFF;
+            else {
+                // httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "parameter on_off error");
+                // return ESP_FAIL;
+            }
+            if(!strcmp(read_mode, "once"))
+                rfid_read_config.rfid_read_mode = RFID_READ_MODE_ONCE;
+            else if(!strcmp(read_mode, "continuous"))
+                rfid_read_config.rfid_read_mode = RFID_READ_MODE_CONTINUOUS;
+            else {
+                // httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "parameter read_mode error");
+                // return ESP_FAIL;
+            }
+            rfid_read_config.ant_sel = atoi(ant_sel);
+            rfid_read_config.read_interval_time = atoi(interval_time);
+            printf("ant_sel:%x\r\n", rfid_read_config.ant_sel);
+            printf("read_interval_time:%ld\r\n", rfid_read_config.read_interval_time);
+            
+            RFID_ReadEPC(rfid_read_config);
         }
 
-        if(!strcmp(on_off, "on"))
-            rfid_read_config.rfid_read_on_off = RFID_READ_ON;
-        else if(!strcmp(on_off, "off"))
-            rfid_read_config.rfid_read_on_off = RFID_READ_OFF;
-        else {
-            // httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "parameter on_off error");
-            // return ESP_FAIL;
-        }
-        if(!strcmp(read_mode, "once"))
-            rfid_read_config.rfid_read_mode = RFID_READ_MODE_ONCE;
-        else if(!strcmp(read_mode, "continuous"))
-            rfid_read_config.rfid_read_mode = RFID_READ_MODE_CONTINUOUS;
-        else {
-            // httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "parameter read_mode error");
-            // return ESP_FAIL;
-        }
-        rfid_read_config.ant_sel = atoi(ant_sel);
-        rfid_read_config.read_interval_time = atoi(interval_time);
-        printf("ant_sel:%x\r\n", rfid_read_config.ant_sel);
-        printf("read_interval_time:%ld\r\n", rfid_read_config.read_interval_time);
-        
+        if (strncmp(event->topic, "pushtime", event->topic_len) == 0)
+        {   
+            // 解析JSON数据
+            char time[20] = "";
+            char errvalue[20] = "";
 
-        RFID_ReadEPC(rfid_read_config);
+            // // 判断数据是否是 JSON 格式
+            if (is_json_data(event->data, event->data_len)) {
+                
+                ESP_LOGI(TAG, "Valid JSON data received");
+                // 使用 json_parse_message 函数解析 JSON 消息
+                // json_parse_message(event->data, event->data_len);
+            } else {
+                ESP_LOGI(TAG, "Received data is not in JSON format");
+                break;
+            }
+            
 
+            jparse_ctx_t jctx;
+            int ps_ret = json_parse_start(&jctx, event->data, event->data_len);
+            char str_val[64];
+           
+            if (json_obj_get_string(&jctx, "time", str_val, sizeof(str_val)) == OS_SUCCESS) {
+                snprintf(time, sizeof(time), "%.*s", sizeof(time) - 1, str_val);
+                ESP_LOGI(TAG, "control time is: %s\n", time);
+            } else {
+                // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
+                // return ESP_FAIL;
+            }
+            if (json_obj_get_string(&jctx, "errValue", str_val, sizeof(str_val)) == OS_SUCCESS) {
+                snprintf(errvalue, sizeof(errvalue), "%.*s", sizeof(errvalue) - 1, str_val);
+                ESP_LOGI(TAG, "errValue  is: %s\n", errvalue);
+            } else {
+                // httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid post");
+                // return ESP_FAIL;
+            }
+            pushtime_count = atoi(time);
+            printf("push time is:%d\r\n",pushtime_count);
+            err_value = atoi(errvalue);
+            printf("errvalue is:%d\r\n",err_value);
+  
+        }
 
         //------------------
 
@@ -309,12 +387,49 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 static void mqtt_app_start(void)
 {
+    ESP_LOGI(TAG,"ABC: %s\r\n",sys_info_config.mqtt_address);
+    // 创建遗嘱消息的 JSON 对象
+    cJSON *lwt_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(lwt_json, "id", lwt_content);
+    lwt_msg = cJSON_PrintUnformatted(lwt_json);   // 将 JSON 对象转换为字符串
+    
     esp_mqtt_client_config_t mqtt_cfg = {
         // .broker.address.uri = sys_info_config.mqtt_address,
-        .broker.address.uri =sys_info_config.mqtt_address,
-        .credentials.username = "starry",
-        .credentials.authentication.password = "emqttx"
+        .broker = {               // 嵌套的结构体需要用花括号
+            .address = {
+                .uri = sys_info_config.mqtt_address,  // MQTT Broker URI
+            }
+        },
+        .credentials = {
+            // .username = "starry",
+            // .authentication = {
+            //     .password = "emqttx",  // MQTT Password
+            // }
+
+            // .username = "doubleCoinChongQing",
+            // .authentication = {
+            //     .password = "Cadcad431.",  // MQTT Password
+            // }
+
+            .username = "hjie",
+            .authentication = {
+                .password = "129223.",  // MQTT Password
+            }
+            
+        },
+     
+        .session = {
+            .keepalive = 60,  // 设置 Keep-Alive 时间
+            
+            .last_will = {
+                .topic = "devices/status/disconnect",   // 遗嘱消息主题
+                .msg = lwt_msg,        // 遗嘱消息内容
+                .qos = 1,
+                .retain = true,
+            }
+        }
     };
+ 
     // mqtt_cfg.authentication.username="starry";
     // mqtt_cfg.authentication.password="";
     // mqtt_cfg.broker.address.uri = sys_info_config.mqtt_address;
@@ -322,6 +437,9 @@ static void mqtt_app_start(void)
     /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
     esp_mqtt_client_register_event(mqtt_client, -1, mqtt_event_handler, NULL);//注册事件处理函数
     esp_mqtt_client_start(mqtt_client);//启动MQTT客户端
+
+    // 释放 JSON 对象，但不释放 lwt_msg，因为 MQTT 客户端需要使用它
+    cJSON_Delete(lwt_json);
 }
 
 
@@ -421,6 +539,7 @@ static void module_4G_init(void)
     modem_config.flags |= MODEM_FLAGS_INIT_NOT_BLOCK;
 #endif
     modem_config.handler = on_modem_event;
+    ESP_LOGI(TAG, "0000000000000000000000000000000000000");
     modem_board_init(&modem_config);
 }
 
@@ -435,6 +554,8 @@ static void wifi_ap_init(void)
 void network_init(void)
 {
     // module_4G_init();
+
+    //2025.1.2
     if(sys_info_config.sys_networking_mode == SYS_NETWORKING_4G) {
         module_4G_init();
     } else if(sys_info_config.sys_networking_mode == SYS_NETWORKING_ETHERNET) {
@@ -443,11 +564,12 @@ void network_init(void)
         module_4G_init();
         ethernet_w5500_init();
     } else {
-         ESP_LOGI(TAG, "=========fatal err=========");
-         return;
+        ESP_LOGI(TAG, "=========fatal err=========");
+        return;
     } 
     ESP_LOGI(TAG, "=========Network connected=========");
-    wifi_ap_init();
+
+    wifi_ap_init();//热点
 }
 
 void mqtt_init(void)

@@ -3,8 +3,9 @@
 #include "stdlib.h"
 #include "stdint.h"
 #include "freertos/semphr.h"//信号量头文件
-
-
+#include <stdbool.h>
+#include "rfidnetwork.h"
+#include <math.h>
 
 static const char *TAG = "RFID_Del";
 
@@ -541,22 +542,14 @@ void RFID_ShowEpc(EPC_Info_t  **EPC_ptr)
         printf("No:%d       EPCID:%x%x    antID:%d    Temp:%.2f\r\n",i+1,EPC_ptr[i]->epcId[0],EPC_ptr[i]->epcId[1],EPC_ptr[i]->antID,EPC_ptr[i]->tempe/100.0);
     }
 }
-// extern SemaphoreHandle_t xBinarySemaphore;
-// extern SemaphoreHandle_t mqtt_xBinarySemaphore;
+
+
 //读EPC任务
-int count2;
 void RFID_ReadEpcTask(void *arg)
 {
     BaseDataFrame_t  EPCFrame;
-
-    // // 创建二元信号量
-    // xBinarySemaphore = xSemaphoreCreateBinary();
-    
-    // if ( xBinarySemaphore == NULL )
-    // {
-    //     // printf("创建信号量失败\r\n");
-    //     return;
-    // }
+    bool flag = false;
+    uint8_t abs_err_temp;
 
     while(1)
     {
@@ -565,40 +558,85 @@ void RFID_ReadEpcTask(void *arg)
         {
             for(index = 0; index < 120; index++)
             {  
-
                 if(0== EPCFrame.pData[2] && 0 == EPCFrame.pData[3])
                 {
                   break;
                 }
 
-
                 if(LTU3_Lable[index] == NULL)
                 {
-                   epcCnt++;
-                   LTU3_Lable[index] = (EPC_Info_t*)malloc(sizeof(EPC_Info_t));
-                   LTU3_Lable[index]->epcId[0] = EPCFrame.pData[2];
-                   LTU3_Lable[index]->epcId[1] = EPCFrame.pData[3];
-                   LTU3_Lable[index]->antID = EPCFrame.pData[6];
-                   LTU3_Lable[index]->rssi = EPCFrame.pData[8];
-                   LTU3_Lable[index]->tempe = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13]);
-                   sprintf((char*)modbusRtuDataTAB[index],"%x%x:%.2f  ",LTU3_Lable[index]->epcId[0],LTU3_Lable[index]->epcId[1],((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0);
-                 
-                   break;
+                    epcCnt++;
+                    LTU3_Lable[index] = (EPC_Info_t*)malloc(sizeof(EPC_Info_t));
+                    if (LTU3_Lable[index] == NULL) {
+                        ESP_LOGE(TAG, "Memory allocation failed for EPC_Info_t");
+                        break; // 内存分配失败跳出
+                    }
+                    LTU3_Lable[index]->epcId[0] = EPCFrame.pData[2];
+                    LTU3_Lable[index]->epcId[1] = EPCFrame.pData[3];
+                    LTU3_Lable[index]->antID = EPCFrame.pData[6];
+                    LTU3_Lable[index]->rssi = EPCFrame.pData[8];
+                    LTU3_Lable[index]->tempe = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13]);
+                    LTU3_Lable[index]->last_temp = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0;
+                    LTU3_Lable[index]->filtered_tempe = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0;//滤波初始值
+                    sprintf((char*)modbusRtuDataTAB[index],"%x%x:%.2f  ",LTU3_Lable[index]->epcId[0],LTU3_Lable[index]->epcId[1],((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0);
+                    flag=true;
+                    break;
                 }
                 if(LTU3_Lable[index]->epcId[0] == EPCFrame.pData[2] && LTU3_Lable[index]->epcId[1] == EPCFrame.pData[3])
                 {
                     sprintf((char*)modbusRtuDataTAB[index],"%x%x:%.2f  ",LTU3_Lable[index]->epcId[0],LTU3_Lable[index]->epcId[1],((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0);
-                    LTU3_Lable[index]->tempe = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13]);
+                    // 先保存旧温度值
+                    // float old_temp = LTU3_Lable[index]->tempe / 100.0; 
+                    // LTU3_Lable[index]->last_temp = old_temp;           // 更新 last_temp 为旧值
+
+                    // // 再更新新温度值
+                    // int16_t raw_tempe = (int16_t)(EPCFrame.pData[12] << 8 | EPCFrame.pData[13]);
+                    // LTU3_Lable[index]->tempe = raw_tempe;              // 更新 tempe 为新值
+                    // float new_temp = raw_tempe / 100.0;
+
+                    // 更新已有标签
+                    int16_t raw_tempe = (EPCFrame.pData[12] << 8) | EPCFrame.pData[13];
+                    float new_temp = raw_tempe / 100.0f;
+
+                    // 保存旧温度值
+                    float old_temp = LTU3_Lable[index]->filtered_tempe;
+                    LTU3_Lable[index]->last_temp = old_temp;
+
+                    // 应用低通滤波
+                    float filtered_temp = ALPHA * new_temp + (1 - ALPHA) * old_temp;
+                    LTU3_Lable[index]->filtered_tempe = filtered_temp;
+    
+
+                    LTU3_Lable[index]->tempe =  LTU3_Lable[index]->filtered_tempe*100.0f;
                     LTU3_Lable[index]->antID = EPCFrame.pData[6];
                     LTU3_Lable[index]->rssi = EPCFrame.pData[8];
-                    
-                    break;
+                    // abs_err_temp= abs((int)((LTU3_Lable[index]->last_temp)-(LTU3_Lable[index]->tempe)/100.0));
+
+                    // // 计算温差
+                    // abs_err_temp = (uint8_t)(fabsf(new_temp - old_temp)); // 转换为整数
+
+                    // 判断温差是否超阈值
+                    // if (abs_err_temp >= err_value) {
+                    //     ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
+                    //             LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
+                    //             old_temp, new_temp, abs_err_temp);
+                    //     flag = true;
+                    // }
+                    // break;
+
+                     // 计算温差
+                     abs_err_temp = (uint8_t)(fabsf(filtered_temp - old_temp));
+
+                     // 判断是否触发报警
+                     if (abs_err_temp >= err_value) {
+                         ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
+                                 LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
+                                 old_temp, filtered_temp, abs_err_temp);
+                         flag = true;
+                     }
+                     break;
                 }
             }
-
-
-            // count2++;
-            // printf("epcframe count:%d \n",count2);
 
             ESP_LOGI(TAG,"%02x%02x:%.2f\r\n",EPCFrame.pData[2],EPCFrame.pData[3],(((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0));
 
@@ -612,9 +650,15 @@ void RFID_ReadEpcTask(void *arg)
             {
                 epc_read_speed = 0;
             }
-            xSemaphoreGive(xBinarySemaphore);     //给予一次信息量
-            xSemaphoreGive(mqtt_xBinarySemaphore);//给予一次信息量
-            
+
+            // xSemaphoreGive(xBinarySemaphore);     //给予一次信息量
+
+            if (flag){
+                xSemaphoreGive(mqtt_xBinarySemaphore);//给予一次信息量
+                flag=false;
+            }
+            free(EPCFrame.pData);//20250219
+                
         }
         vTaskDelay(100/portTICK_PERIOD_MS);
     }

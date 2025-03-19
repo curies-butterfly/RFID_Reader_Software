@@ -940,15 +940,15 @@ static esp_err_t rfid_epc_get_handler(httpd_req_t *req)
     char  *epc_data = NULL;
     if(epcCnt == 0)         //防止出现空指针
     {
-        epc_data = (char*)malloc(sizeof(char) * 1 * 50);
-        memset(epc_data,'\0',sizeof(char) * 1 * 50);
+        epc_data = (char*)malloc(sizeof(char) * 1 * 120);
+        memset(epc_data,'\0',sizeof(char) * 1 * 120);
     }
     else
     {
-        epc_data = (char*)malloc(sizeof(char) * epcCnt * 50);
-        memset(epc_data,'\0',sizeof(char) * epcCnt * 50);
+        epc_data = (char*)malloc(sizeof(char) * epcCnt * 120);
+        memset(epc_data,'\0',sizeof(char) * epcCnt * 120);
     }
-    char  one_epc_data[50] = {'\0'};
+    char  one_epc_data[120] = {'\0'};
     uint16_t epc_read_rate = epc_read_speed;
     epc_read_speed = 0;
     for(int i = 0; i < 120; i++)
@@ -956,7 +956,7 @@ static esp_err_t rfid_epc_get_handler(httpd_req_t *req)
         if(EPC_ptr[i] == NULL)
             break;
         memset(one_epc_data,0,sizeof(one_epc_data));
-        sprintf(one_epc_data,"{\"epc\":\"%x%x\",\"tem\":%.2f,\"ant\":%d,\"rssi\":%d}",              \
+        sprintf(one_epc_data,"{\"epc\":\"%02x%02x\",\"tem\":%.2f,\"ant\":%d,\"rssi\":%d}",              \
         EPC_ptr[i]->epcId[0],EPC_ptr[i]->epcId[1],EPC_ptr[i]->tempe/100.0,EPC_ptr[i]->antID,EPC_ptr[i]->rssi); 
         strcat(epc_data,one_epc_data);
         strcat(epc_data,",");

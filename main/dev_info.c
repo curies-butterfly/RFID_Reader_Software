@@ -4,7 +4,12 @@
 #include "esp_log.h"
 #include "esp_mac.h"
 
-uint32_t chip_id;
+uint64_t chip_id;
+char chip_id_str[20];  // 用于存储格式化后的十六进制数
+char send_topic[100];  //发送主题字符串
+char lwt_content[100];  //遗嘱主题内容设备id号
+
+
 void get_chip_IDinfo(void)
 { 
     // // 获取芯片信息
@@ -38,11 +43,19 @@ void get_chip_IDinfo(void)
 
         chip_id = 0;
         for (int i = 0; i < 6; i++) {
-            chip_id |= ((uint32_t)mac[i] << (8 * i));
+            chip_id |= ((uint64_t)mac[i] << (8 * (5-i)));
         }
-        printf("Chip ID: %08lx\n", chip_id);
+        printf("Chip ID: %012llx\n", chip_id);
     } else {
         printf("Failed to get MAC address: %s\n", esp_err_to_name(ret));
     }
+
+        // 格式化并将64位整数写入字符串
+    snprintf(chip_id_str, sizeof(chip_id_str), "%012llx", chip_id);
+    // 拼接字符串
+    snprintf(send_topic, sizeof(send_topic), "rfid/%s", chip_id_str);
+    snprintf(lwt_content, sizeof(lwt_content), "%s", chip_id_str);//遗嘱消息设备id号
+
+
 }
 
