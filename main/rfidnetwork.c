@@ -10,6 +10,8 @@
 #include "esp_eth.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_wifi.h"
+#include "esp_mac.h"
 
 #include "esp_flash.h"
 #include "esp_system.h"
@@ -39,6 +41,45 @@ static const char *TAG = "rfid_network";
 static const char *TAG_4G = "network_4G_module";
 static const char *TAG_ETHERNET = "network_ethernet";
 static const char *TAG_MQTT = "mqtt";
+static const char *TAG_AP = "WiFi SoftAP";
+static const char *TAG_STA = "WiFi Sta";
+/* STA Configuration */
+#define EXAMPLE_ESP_WIFI_STA_SSID           CONFIG_ESP_WIFI_REMOTE_AP_SSID
+#define EXAMPLE_ESP_WIFI_STA_PASSWD         CONFIG_ESP_WIFI_REMOTE_AP_PASSWORD
+#define EXAMPLE_ESP_MAXIMUM_RETRY           CONFIG_ESP_MAXIMUM_STA_RETRY
+
+#if CONFIG_ESP_WIFI_AUTH_OPEN
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD   WIFI_AUTH_OPEN
+#elif CONFIG_ESP_WIFI_AUTH_WEP
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD   WIFI_AUTH_WEP
+#elif CONFIG_ESP_WIFI_AUTH_WPA_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD   WIFI_AUTH_WPA_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WPA2_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD   WIFI_AUTH_WPA2_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WPA_WPA2_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD   WIFI_AUTH_WPA_WPA2_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WPA3_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD   WIFI_AUTH_WPA3_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WPA2_WPA3_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD   WIFI_AUTH_WPA2_WPA3_PSK
+#elif CONFIG_ESP_WIFI_AUTH_WAPI_PSK
+#define ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD   WIFI_AUTH_WAPI_PSK
+#endif
+
+/* AP Configuration */
+#define EXAMPLE_ESP_WIFI_AP_SSID            CONFIG_ESP_WIFI_AP_SSID
+#define EXAMPLE_ESP_WIFI_AP_PASSWD          CONFIG_ESP_WIFI_AP_PASSWORD
+#define EXAMPLE_ESP_WIFI_CHANNEL            CONFIG_ESP_WIFI_AP_CHANNEL
+#define EXAMPLE_MAX_STA_CONN                CONFIG_ESP_MAX_STA_CONN_AP
+
+#define WIFI_CONNECTED_BIT BIT0
+#define WIFI_FAIL_BIT      BIT1
+
+static int s_retry_num = 0;
+
+/* FreeRTOS event group to signal when we are connected/disconnected */
+static EventGroupHandle_t s_wifi_event_group;
+
 
 
 // 定义全局变量以确保生命周期
@@ -237,22 +278,43 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             char interval_time[5] = "";
             char buf[512] = { 0 };
             rfid_read_config_t rfid_read_config;
-
             
-
-            // // 判断数据是否是 JSON 格式
-            if (is_json_data(event->data, event->data_len)) {
+            // // // 判断数据是否是 JSON 格式
+            // if (is_json_data(event->data, event->data_len)) {
                 
+            //     ESP_LOGI(TAG, "Valid JSON data received");
+            //     // 使用 json_parse_message 函数解析 JSON 消息
+            //     // json_parse_message(event->data, event->data_len);
+            // } else {
+            //     ESP_LOGI(TAG, "Received data is not in JSON format");
+            //     break;
+            // }
+
+            // 声明 JSON 解析上下文
+            jparse_ctx_t jctx;
+            memset(&jctx, 0, sizeof(jparse_ctx_t));
+
+            // 使用 json_parse_start 严格验证 JSON 格式
+            int parse_ret = json_parse_start(&jctx, event->data, event->data_len);
+            if (parse_ret == OS_SUCCESS) {
                 ESP_LOGI(TAG, "Valid JSON data received");
-                // 使用 json_parse_message 函数解析 JSON 消息
-                // json_parse_message(event->data, event->data_len);
+                
+                /* 这里添加具体解析逻辑，例如：
+                if (json_obj_get_string(&jctx, "on_off", on_off, sizeof(on_off)) == OS_SUCCESS) {
+                    ESP_LOGI(TAG, "on_off: %s", on_off);
+                }
+                */
+
+                // 必须清理解析上下文
+                json_parse_end(&jctx);
             } else {
-                ESP_LOGI(TAG, "Received data is not in JSON format");
+                ESP_LOGE(TAG, "Invalid JSON format (error=%d)", parse_ret);
+                json_parse_end(&jctx); // 仍然需要清理
                 break;
             }
             
 
-            jparse_ctx_t jctx;
+            // jparse_ctx_t jctx;
             int ps_ret = json_parse_start(&jctx, event->data, event->data_len);
             char str_val[64];
             if (json_obj_get_string(&jctx, "on_off", str_val, sizeof(str_val)) == OS_SUCCESS) {
@@ -313,20 +375,30 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             // 解析JSON数据
             char time[20] = "";
             char errvalue[20] = "";
-
-            // // 判断数据是否是 JSON 格式
-            if (is_json_data(event->data, event->data_len)) {
-                
-                ESP_LOGI(TAG, "Valid JSON data received");
-                // 使用 json_parse_message 函数解析 JSON 消息
-                // json_parse_message(event->data, event->data_len);
-            } else {
-                ESP_LOGI(TAG, "Received data is not in JSON format");
-                break;
-            }
-            
-
             jparse_ctx_t jctx;
+            // // 判断数据是否是 JSON 格式
+            // if (is_json_data(event->data, event->data_len)) {
+                
+            //     ESP_LOGI(TAG, "Valid JSON data received");
+            //     // 使用 json_parse_message 函数解析 JSON 消息
+            //     // json_parse_message(event->data, event->data_len);
+            // } else {
+            //     ESP_LOGI(TAG, "Received data is not in JSON format");
+            //     break;
+            // }
+            
+            int parse_ret = json_parse_start(&jctx, event->data, event->data_len);
+            if (parse_ret == OS_SUCCESS) {
+                ESP_LOGI(TAG, "Valid JSON data received");
+                // 必须清理解析上下文
+                json_parse_end(&jctx);
+            } else {
+                ESP_LOGE(TAG, "Invalid JSON format (error=%d)", parse_ret);
+                json_parse_end(&jctx); // 仍然需要清理
+                break;
+            }    
+
+
             int ps_ret = json_parse_start(&jctx, event->data, event->data_len);
             char str_val[64];
            
@@ -539,16 +611,64 @@ static void module_4G_init(void)
     modem_config.flags |= MODEM_FLAGS_INIT_NOT_BLOCK;
 #endif
     modem_config.handler = on_modem_event;
-    ESP_LOGI(TAG, "0000000000000000000000000000000000000");
+    
     modem_board_init(&modem_config);
 }
-
 
 static void wifi_ap_init(void)
 {
     esp_netif_t *ap_netif = modem_wifi_ap_init();
     assert(ap_netif != NULL);
     ESP_ERROR_CHECK(modem_wifi_set(s_modem_wifi_config));
+}
+
+static void wifi_ap_sta_init(void) {
+    // 初始化 Wi-Fi 驱动
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+    // 设置 Wi-Fi 模式为 AP+STA
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+
+    // 创建 AP 模式的网络接口
+    esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();//创建一个默认的WIFI接入点AP的网络端口
+    assert(ap_netif != NULL);  // 确保创建成功
+
+    // 配置 AP 模式的 Wi-Fi 参数
+    wifi_config_t ap_config = {
+        .ap = {
+            .ssid = EXAMPLE_ESP_WIFI_AP_SSID,//ssid名称
+            .password = EXAMPLE_ESP_WIFI_AP_PASSWD,//密钥
+            .channel = EXAMPLE_ESP_WIFI_CHANNEL,//通道
+            .max_connection = EXAMPLE_MAX_STA_CONN,//最大连接数
+            .authmode = WIFI_AUTH_WPA2_PSK,//认证模式
+        },
+    };
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));//设置AP模式下的Wi-Fi参数
+
+    // 创建 STA 模式的网络接口
+    esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();//创建一个默认的WIFI客户端STA的网络端口，并返回指向该接口的指针
+    assert(sta_netif != NULL);  // 确保创建成功
+
+    // 配置 STA 模式的 Wi-Fi 参数
+    wifi_config_t sta_config = {
+        .sta = {
+            .ssid = EXAMPLE_ESP_WIFI_STA_SSID,//ssid名称
+            .password = EXAMPLE_ESP_WIFI_STA_PASSWD,//密钥
+            .scan_method = WIFI_ALL_CHANNEL_SCAN,//扫描方式
+            .failure_retry_cnt = EXAMPLE_ESP_MAXIMUM_RETRY,//失败重试次数
+            .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,//认证模式
+        },
+    };
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));//设置STA模式下的Wi-Fi参数
+
+    // 启动 Wi-Fi
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    // 连接 STA 模式
+    ESP_ERROR_CHECK(esp_wifi_connect());
+
+    ESP_LOGI(TAG_STA, "WiFi STA mode initialized, connecting to SSID: %s", EXAMPLE_ESP_WIFI_STA_SSID);//打印信息，连接Wi-Fi的ssid名称
 }
 
 void network_init(void)
@@ -569,7 +689,9 @@ void network_init(void)
     } 
     ESP_LOGI(TAG, "=========Network connected=========");
 
-    wifi_ap_init();//热点
+    // wifi_ap_init();//热点
+    wifi_ap_sta_init();//配置ap+sta模式
+   
 }
 
 void mqtt_init(void)

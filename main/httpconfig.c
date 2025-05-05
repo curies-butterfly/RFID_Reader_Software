@@ -24,6 +24,9 @@
 #include "sht30.h"
 #include "rfidmodule.h"
 
+#define debug_flag 1
+#define debug_ "*"
+#define online "http://localhost:8080"
 
 static const char *TAG = "rfid_reader_http_server";
 #define HTTPD_401 "401 UNAUTHORIZED"                /*!< HTTP Response 401 */
@@ -417,7 +420,14 @@ static esp_err_t login_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "%.*s", len_ret, buf);
         ESP_LOGI(TAG, "====================================");
     }
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+
+    
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
+
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
     jparse_ctx_t jctx;
@@ -513,7 +523,12 @@ static esp_err_t auth_info_get_handler(httpd_req_t *req)
      */
     esp_err_t ret = httpd_resp_set_status(req, HTTPD_200);
     ESP_ERROR_CHECK(ret);
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+ 
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
@@ -574,7 +589,12 @@ static esp_err_t auth_info_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "%.*s", len_ret, buf);
         ESP_LOGI(TAG, "====================================");
     }
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+     
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     jparse_ctx_t jctx;
@@ -679,7 +699,12 @@ static esp_err_t wlan_general_get_handler(httpd_req_t *req)
      */
     esp_err_t ret = httpd_resp_set_status(req, HTTPD_200);
     ESP_ERROR_CHECK(ret);
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+     
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
@@ -744,7 +769,12 @@ static esp_err_t wlan_general_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "%.*s", len_ret, buf);
         ESP_LOGI(TAG, "====================================");
     }
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+     
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     jparse_ctx_t jctx;
@@ -860,7 +890,12 @@ static esp_err_t sys_sta_get_handler(httpd_req_t *req)
      */
     esp_err_t ret = httpd_resp_set_status(req, HTTPD_200);
     ESP_ERROR_CHECK(ret);
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+     
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
@@ -901,7 +936,12 @@ static esp_err_t sys_restart_get_handler(httpd_req_t *req)
      */
     esp_err_t ret = httpd_resp_set_status(req, HTTPD_200);
     ESP_ERROR_CHECK(ret);
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+     
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
@@ -972,7 +1012,12 @@ static esp_err_t rfid_epc_get_handler(httpd_req_t *req)
      */
     esp_err_t ret = httpd_resp_set_status(req, HTTPD_200);
     ESP_ERROR_CHECK(ret);
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+     
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
@@ -1065,7 +1110,12 @@ static esp_err_t sys_info_get_handler(httpd_req_t *req)
      */
     esp_err_t ret = httpd_resp_set_status(req, HTTPD_200);
     ESP_ERROR_CHECK(ret);
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+    
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
@@ -1130,7 +1180,12 @@ static esp_err_t sys_info_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "%.*s", len_ret, buf);
         ESP_LOGI(TAG, "====================================");
     }
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+     
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     jparse_ctx_t jctx;
@@ -1282,7 +1337,12 @@ static esp_err_t rfid_read_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "%.*s", len_ret, buf);
         ESP_LOGI(TAG, "====================================");
     }
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "http://localhost:8080");
+     
+    #ifdef debug_flag
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", debug_);  // 调试模式， 允许所有来源
+    #else
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", online);  // 非调试模式，"http://localhost:8080"
+    #endif
     httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
     httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     jparse_ctx_t jctx;

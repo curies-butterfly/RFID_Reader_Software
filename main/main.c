@@ -46,10 +46,10 @@
 
 #include "dev_info.h"
 #include "OLEDDisplay.h"
-#include "oleddisplayfonts.h"
+#include "OLEDDisplayFonts.h"
 #include "ntc_temp_adc.h"
 #include "hal/wdt_hal.h"
-
+#include "at.h"
 #include "tp1107.h"
 
 static const char *TAG = "rfid_reader";
@@ -356,8 +356,18 @@ void oled_data_display(OLEDDisplay_t *oled){
   OLEDDisplay_flipScreenVertically(oled);//反转镜像
 }
 
+// 将 JSON 转为 hex 字符串
+void json_to_hex_str(const char *json, char *hex_out)
+{
+    while (*json) {
+        sprintf(hex_out, "%02X", (unsigned char)*json);
+        hex_out += 2;
+        json++;
+    }
+}
 void app_main(void)
 {
+    
     get_chip_IDinfo();//获取芯片ID信息
 
     wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();//看门狗计时器WDT 初始化
@@ -368,6 +378,8 @@ void app_main(void)
     _led_indicator_init();//指示灯 io初始化
 
     esp_err_t ret = nvs_flash_init();//nvs初始化
+
+   
 
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         //若由于分区版本更新或无可用页(存储空间不足)，尝试格式化并重新初始化
@@ -444,11 +456,10 @@ void app_main(void)
 
     uart1_Init();
     
-    uart2_Init();
-
-    moduleSetGpioInit();
-    // iic_init();
-    modBusRtu_Init();
+    // uart2_Init();
+    // moduleSetGpioInit();
+    // // iic_init();
+    // modBusRtu_Init();
 
     // xEventGroup = xEventGroupCreate();
     // if (xEventGroup == NULL) {
@@ -524,13 +535,16 @@ void app_main(void)
     // xSemaphoreGive(uart1_rx_xBinarySemaphore);//给予一次信息量
     // vTaskDelay(1000 / portTICK_PERIOD_MS); // 延迟 1 秒
 
-    // ctrl_rfid_mode(2);
+    ctrl_rfid_mode(2);
 
 
     while(1)
     {
         wdt_hal_feed(&rwdt_ctx);
-       
+        
+
+
+
         printf("free heap size: %d\r\n",xPortGetFreeHeapSize());
 
         // RFID_ShowEpc(LTU3_Lable);
@@ -549,3 +563,21 @@ void app_main(void)
     }
 }
 
+    // unb_tp1107_init();
+ // const char *json_data = "{\"status\":\"200\",\"epc_cnt\":\"2\",\"read_rate\":\"20\",\"data\":[{\"epc\":\"2613\",\"tem\":26.58,\"ant\":4,\"rssi\":88},{\"epc\":\"061e\",\"tem\":21.98,\"ant\":4,\"rssi\":53}]}";
+
+    // char hex_data[1024] = {0};
+    // json_to_hex_str(json_data, hex_data);
+    // size_t json_len = strlen(json_data);  // 注意是原始长度（字节）
+
+    // ESP_LOGI(TAG, "Original JSON (%d bytes): %s", json_len, json_data);
+    // ESP_LOGI(TAG, "Hex encoded JSON: %s", hex_data);
+
+    // // 构造 AT 命令
+    // char at_cmd[512] = {0};
+    // snprintf(at_cmd, sizeof(at_cmd), "AT+UNBSEND=%d,%s,0\r\n", json_len, hex_data);
+    
+    // ESP_LOGI(TAG, "Sending AT command:\n%s", at_cmd);
+
+    // 发送命令
+    // uart_write_bytes(UART_PORT, at_cmd, strlen(at_cmd));

@@ -568,8 +568,6 @@ void modbusRtushow_Task(void *arg)
     //     vTaskDelay(200/portTICK_PERIOD_MS);
     // }
 
-
-
 }
 
 

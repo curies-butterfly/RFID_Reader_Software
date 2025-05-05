@@ -23,7 +23,10 @@ char *FreqTab[40] = {"国标 920~925MHz","国标 840~845MHz","国标 840~845MHz 
 
 char *ProtocolTab[40] ={"ISO18000-6C/EPC C1G2","ISO18000-6B","国标 GB/T 29768-2013","国军标 GJB 7383.1-2011"};
 
-
+#define P1 0.000181
+#define P2 -0.0079
+#define P3 1.81
+#define P4 -67.7
 
 rfid_read_config_t rfid_read_config = {
     .rfid_read_on_off = RFID_READ_ON,
@@ -32,6 +35,7 @@ rfid_read_config_t rfid_read_config = {
     .read_interval_time = 1000,
 };
 
+uint8_t type_epc= TAG_TYPE_XY;//默认悦和 TAG_TYPE_YH
 /*****************************************************
 函数名称：void ClearRecvFlag()
 函数功能：清除接收标志
@@ -98,6 +102,8 @@ void RFID_SendBaseFrame(BaseDataFrame_t BaseDataFrame)
     Uint16toByte(BaseDataFrame.DataLen,uint8Type);        //数据长度 2个Byte
     SendBuff[index++] = uint8Type[0];
     SendBuff[index++] = uint8Type[1];
+    // printf("uint8Type[0]:%d,uint8Type[1]:%d\r\n",uint8Type[0],uint8Type[1]);
+
     for(int i = 0 ; i < BaseDataFrame.DataLen;i++)
     {
         // if((BaseDataFrame.pData+i) == NULL)
@@ -113,6 +119,14 @@ void RFID_SendBaseFrame(BaseDataFrame_t BaseDataFrame)
     Uint16toByte(crcValue,uint8Type); 
     SendBuff[index++] = uint8Type[0];
     SendBuff[index++] = uint8Type[1];
+
+    // ESP_LOGE("EPC_READ!!!:%x",(char*)SendBuff);
+     // 打印SendBuff内容
+     printf("SendBuff Content (Hex):!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ");
+     for(int i = 0; i < index; i++) {
+         printf("%02X ", SendBuff[i]);  // 以16进制格式打印每个字节
+     }
+     printf("\n");
     RFID_SendBytes((char*)SendBuff,(size_t)index);
     free(SendBuff); 
 }
@@ -137,6 +151,9 @@ void RFID_SendBaseFrameTest()
     RFID_SendBaseFrame(TestDataFrame);
 }
 
+// 2025-04-29 19:25:18.325 -[Info]- send-   [MsgBaseStop]-        [5A000102FF0000885A]
+// 2025-04-29 19:25:18.326 -[Info]- send-   [MsgBaseInventoryEpc]-[5A0001021000050000000F01D788]
+// 2025-04-29 19:25:18.369 -[Info]- receive-[MsgBaseInventoryEpc]-[5A0001021000010029B5]
 
 /*****************************************************
 函数名称：void RFID_SendCmdStop()
@@ -462,6 +479,14 @@ result_t RFID_GetWorkFreq(WorkFreq_t *WorkFreq)
 返回值：  无
 注：
 *********************************************************/
+
+// 2025-04-29 19:25:18.325 -[Info]- send-   [MsgBaseStop]-        [5A000102FF0000885A]
+// 2025-04-29 19:25:18.326 -[Info]- send-   [MsgBaseInventoryEpc]-[5A0001021000050000000F01D788]
+// 2025-04-29 19:25:18.369 -[Info]- receive-[MsgBaseInventoryEpc]-[5A0001021000010029B5]
+
+// 5A 00 01 02 10 00 05 00 00 00 0F 01 D7 88
+// 5A 00 01 02 10 00 07 00 00 00 0F 01 12 02 56 C5 
+// 5A 00 01 02 10 00 05 00 00 00 0F 01 D7 88
 void RFID_SendReadEpcCmd(uint8_t ant,uint8_t mode)
 {
     BaseDataFrame_t DataFrame;
@@ -471,7 +496,17 @@ void RFID_SendReadEpcCmd(uint8_t ant,uint8_t mode)
     DataFrame.ProCtrl[2] = 0x02;
     DataFrame.ProCtrl[3] = 0x10;
     DataFrame.DevAddr = 0;
-    DataFrame.DataLen = 7;
+
+    if(type_epc==TAG_TYPE_YH)
+    {
+        DataFrame.DataLen = 7;  
+        Cmd[5] = 0x12;          //读取 CTESIUS系列芯片温度数据,LTU31
+        Cmd[6] = 0x02;   
+    }else{
+        DataFrame.DataLen = 5;     
+    }
+    
+    // DataFrame.DataLen = 6;
     Cmd[0] = 0;     //MSB ，大端格式，Bit 31-24
     Cmd[1] = 0;
     Cmd[2] = 0;
@@ -480,8 +515,7 @@ void RFID_SendReadEpcCmd(uint8_t ant,uint8_t mode)
         Cmd[4] = 0x01;
     else    
         Cmd[4] = 0x00;
-    Cmd[5] = 0x12;          //读取 CTESIUS系列芯片温度数据,LTU31
-    Cmd[6] = 0x02;
+   
     DataFrame.pData = Cmd;
     ClearRecvFlag();
     RFID_StopRead();
@@ -496,7 +530,16 @@ result_t RFID_ReadEPC(rfid_read_config_t rfid_read_config)
     DataFrame.ProCtrl[2] = 0x02;
     DataFrame.ProCtrl[3] = 0x10;
     DataFrame.DevAddr = 0;
-    DataFrame.DataLen = 7;
+
+    if(type_epc==TAG_TYPE_YH)
+    {
+        DataFrame.DataLen = 7;  
+        Cmd[5] = 0x12;          //读取 CTESIUS系列芯片温度数据,LTU31
+        Cmd[6] = 0x02;   
+    }else{
+        DataFrame.DataLen = 5;     
+    }
+
     Cmd[0] = 0;     //MSB ，大端格式，Bit 31-24
     Cmd[1] = 0;
     Cmd[2] = 0;
@@ -505,8 +548,8 @@ result_t RFID_ReadEPC(rfid_read_config_t rfid_read_config)
         Cmd[4] = 0x01;
     else
         Cmd[4] = 0x00;
-    Cmd[5] = 0x12;          //读取 CTESIUS系列芯片温度数据,LTU31
-    Cmd[6] = 0x02;
+    // Cmd[5] = 0x12;          //读取 CTESIUS系列芯片温度数据,LTU31
+    // Cmd[6] = 0x02;
     DataFrame.pData = Cmd;
 
     if(rfid_read_config.rfid_read_on_off == RFID_READ_OFF)
@@ -545,123 +588,351 @@ void RFID_ShowEpc(EPC_Info_t  **EPC_ptr)
 
 
 //读EPC任务
-void RFID_ReadEpcTask(void *arg)
-{
-    BaseDataFrame_t  EPCFrame;
-    bool flag = false;
-    uint8_t abs_err_temp;
+// void RFID_ReadEpcTask(void *arg)
+// {
+//     BaseDataFrame_t  EPCFrame;
+//     bool flag = false;
+//     // uint8_t abs_err_temp;
 
-    while(1)
-    {
-        int index = 0;
-        if( xQueueReceive( RFID_EpcQueue, &( EPCFrame ), ( TickType_t ) 10 ) )
-        {
-            for(index = 0; index < 120; index++)
-            {  
-                if(0== EPCFrame.pData[2] && 0 == EPCFrame.pData[3])
-                {
-                  break;
-                }
+//     while(1)
+//     {
+//         // int index = 0;
+//         if( xQueueReceive( RFID_EpcQueue, &( EPCFrame ), ( TickType_t ) 10 ) )
+//         {
+//             for(index = 0; index < 120; index++)
+//             {
+              
+//                 if(0== EPCFrame.pData[2] && 0 == EPCFrame.pData[3])//无EPCID
+//                 {
+//                   break;
+//                 }
 
-                if(LTU3_Lable[index] == NULL)
-                {
-                    epcCnt++;
-                    LTU3_Lable[index] = (EPC_Info_t*)malloc(sizeof(EPC_Info_t));
-                    if (LTU3_Lable[index] == NULL) {
-                        ESP_LOGE(TAG, "Memory allocation failed for EPC_Info_t");
-                        break; // 内存分配失败跳出
-                    }
-                    LTU3_Lable[index]->epcId[0] = EPCFrame.pData[2];
-                    LTU3_Lable[index]->epcId[1] = EPCFrame.pData[3];
-                    LTU3_Lable[index]->antID = EPCFrame.pData[6];
-                    LTU3_Lable[index]->rssi = EPCFrame.pData[8];
-                    LTU3_Lable[index]->tempe = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13]);
-                    LTU3_Lable[index]->last_temp = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0;
-                    LTU3_Lable[index]->filtered_tempe = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0;//滤波初始值
-                    sprintf((char*)modbusRtuDataTAB[index],"%x%x:%.2f  ",LTU3_Lable[index]->epcId[0],LTU3_Lable[index]->epcId[1],((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0);
-                    flag=true;
-                    break;
-                }
-                if(LTU3_Lable[index]->epcId[0] == EPCFrame.pData[2] && LTU3_Lable[index]->epcId[1] == EPCFrame.pData[3])
-                {
-                    sprintf((char*)modbusRtuDataTAB[index],"%x%x:%.2f  ",LTU3_Lable[index]->epcId[0],LTU3_Lable[index]->epcId[1],((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0);
-                    // 先保存旧温度值
-                    // float old_temp = LTU3_Lable[index]->tempe / 100.0; 
-                    // LTU3_Lable[index]->last_temp = old_temp;           // 更新 last_temp 为旧值
+//                 //判断标签厂商
+//                 switch(get_tag_type(EPCFrame.pData, EPCFrame.DataLen))
+//                 {
+//                     case TAG_TYPE_YH:
 
-                    // // 再更新新温度值
-                    // int16_t raw_tempe = (int16_t)(EPCFrame.pData[12] << 8 | EPCFrame.pData[13]);
-                    // LTU3_Lable[index]->tempe = raw_tempe;              // 更新 tempe 为新值
-                    // float new_temp = raw_tempe / 100.0;
 
-                    // 更新已有标签
-                    int16_t raw_tempe = (EPCFrame.pData[12] << 8) | EPCFrame.pData[13];
-                    float new_temp = raw_tempe / 100.0f;
+//                         break;
+//                     case TAG_TYPE_XY:
 
-                    // 保存旧温度值
-                    float old_temp = LTU3_Lable[index]->filtered_tempe;
-                    LTU3_Lable[index]->last_temp = old_temp;
 
-                    // 应用低通滤波
-                    float filtered_temp = ALPHA * new_temp + (1 - ALPHA) * old_temp;
-                    LTU3_Lable[index]->filtered_tempe = filtered_temp;
+//                         break;
+//                     default:
+//                         ESP_LOGI("Unknowed_company","未知标签厂商!");
+//                         break;
+//                 }
+
+//                 if(LTU3_Lable[index] == NULL)
+//                 {
+//                     epcCnt++;
+//                     LTU3_Lable[index] = (EPC_Info_t*)malloc(sizeof(EPC_Info_t));
+//                     if (LTU3_Lable[index] == NULL) {
+//                         ESP_LOGE(TAG, "Memory allocation failed for EPC_Info_t");
+//                         break; // 内存分配失败跳出
+//                     }
+//                     LTU3_Lable[index]->epcId[0] = EPCFrame.pData[2];
+//                     LTU3_Lable[index]->epcId[1] = EPCFrame.pData[3];
+//                     LTU3_Lable[index]->antID = EPCFrame.pData[6];
+//                     LTU3_Lable[index]->rssi = EPCFrame.pData[8];
+//                     LTU3_Lable[index]->tempe = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13]);
+//                     LTU3_Lable[index]->last_temp = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0;
+//                     LTU3_Lable[index]->filtered_tempe = ((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0;//滤波初始值
+//                     sprintf((char*)modbusRtuDataTAB[index],"%x%x:%.2f  ",LTU3_Lable[index]->epcId[0],LTU3_Lable[index]->epcId[1],((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0);
+//                     flag=true;
+//                     break;
+//                 }
+//                 if(LTU3_Lable[index]->epcId[0] == EPCFrame.pData[2] && LTU3_Lable[index]->epcId[1] == EPCFrame.pData[3])
+//                 {
+//                     sprintf((char*)modbusRtuDataTAB[index],"%x%x:%.2f  ",LTU3_Lable[index]->epcId[0],LTU3_Lable[index]->epcId[1],((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0);
+//                     // 先保存旧温度值
+//                     // float old_temp = LTU3_Lable[index]->tempe / 100.0; 
+//                     // LTU3_Lable[index]->last_temp = old_temp;           // 更新 last_temp 为旧值
+
+//                     // // 再更新新温度值
+//                     // int16_t raw_tempe = (int16_t)(EPCFrame.pData[12] << 8 | EPCFrame.pData[13]);
+//                     // LTU3_Lable[index]->tempe = raw_tempe;              // 更新 tempe 为新值
+//                     // float new_temp = raw_tempe / 100.0;
+
+//                     // 更新已有标签
+//                     int16_t raw_tempe = (EPCFrame.pData[12] << 8) | EPCFrame.pData[13];
+//                     float new_temp = raw_tempe / 100.0f;
+
+//                     // 保存旧温度值
+//                     float old_temp = LTU3_Lable[index]->filtered_tempe;
+//                     LTU3_Lable[index]->last_temp = old_temp;
+
+//                     // 应用低通滤波
+//                     float filtered_temp = ALPHA * new_temp + (1 - ALPHA) * old_temp;
+//                     LTU3_Lable[index]->filtered_tempe = filtered_temp;
     
 
-                    LTU3_Lable[index]->tempe =  LTU3_Lable[index]->filtered_tempe*100.0f;
-                    LTU3_Lable[index]->antID = EPCFrame.pData[6];
-                    LTU3_Lable[index]->rssi = EPCFrame.pData[8];
-                    // abs_err_temp= abs((int)((LTU3_Lable[index]->last_temp)-(LTU3_Lable[index]->tempe)/100.0));
+//                     LTU3_Lable[index]->tempe =  LTU3_Lable[index]->filtered_tempe*100.0f;
+//                     LTU3_Lable[index]->antID = EPCFrame.pData[6];
+//                     LTU3_Lable[index]->rssi = EPCFrame.pData[8];
+//                     // abs_err_temp= abs((int)((LTU3_Lable[index]->last_temp)-(LTU3_Lable[index]->tempe)/100.0));
 
-                    // // 计算温差
-                    // abs_err_temp = (uint8_t)(fabsf(new_temp - old_temp)); // 转换为整数
+//                     // // 计算温差
+//                     // abs_err_temp = (uint8_t)(fabsf(new_temp - old_temp)); // 转换为整数
 
-                    // 判断温差是否超阈值
-                    // if (abs_err_temp >= err_value) {
-                    //     ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
-                    //             LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
-                    //             old_temp, new_temp, abs_err_temp);
-                    //     flag = true;
-                    // }
-                    // break;
+//                     // 判断温差是否超阈值
+//                     // if (abs_err_temp >= err_value) {
+//                     //     ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
+//                     //             LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
+//                     //             old_temp, new_temp, abs_err_temp);
+//                     //     flag = true;
+//                     // }
+//                     // break;
 
-                     // 计算温差
-                     abs_err_temp = (uint8_t)(fabsf(filtered_temp - old_temp));
+//                      // 计算温差
+//                      abs_err_temp = (uint8_t)(fabsf(filtered_temp - old_temp));
 
-                     // 判断是否触发报警
-                     if (abs_err_temp >= err_value) {
-                         ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
-                                 LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
-                                 old_temp, filtered_temp, abs_err_temp);
-                         flag = true;
-                     }
-                     break;
-                }
+//                      // 判断是否触发报警
+//                      if (abs_err_temp >= err_value) {
+//                          ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
+//                                  LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
+//                                  old_temp, filtered_temp, abs_err_temp);
+//                          flag = true;
+//                      }
+//                      break;
+//                 }
+//             }
+
+//             ESP_LOGI(TAG,"%02x%02x:%.2f\r\n",EPCFrame.pData[2],EPCFrame.pData[3],(((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0));
+
+//             // printf("epcCnt:%d\r\n",epcCnt);
+//             // free(EPCFrame.pData); //释放EPC数据帧的数据存储地址
+
+//                 // xSemaphoreGive(uart1_rx_xBinarySemaphore);//给予一次信息量
+
+//             epc_read_speed++;
+//             if(epc_read_speed > 800) 
+//             {
+//                 epc_read_speed = 0;
+//             }
+
+//             // xSemaphoreGive(xBinarySemaphore);     //给予一次信息量
+
+//             if (flag){
+//                 xSemaphoreGive(mqtt_xBinarySemaphore);//给予一次信息量
+//                 flag=false;
+//             }
+//             free(EPCFrame.pData);//20250219
+                
+//         }
+//         vTaskDelay(100/portTICK_PERIOD_MS);
+//     }
+// }
+void RFID_ReadEpcTask(void *arg)
+{
+    BaseDataFrame_t EPCFrame;
+    bool flag = false;
+
+    while (1) {
+        if (xQueueReceive(RFID_EpcQueue, &EPCFrame, (TickType_t)5)) {
+            TagType tagType = get_tag_type(EPCFrame.pData, EPCFrame.DataLen);
+
+            switch (tagType) {
+                case TAG_TYPE_YH:
+                    // ESP_LOGI("YH", "111111111!");
+                   
+                    handle_tag_yh(&EPCFrame, &flag);
+                    break;
+                case TAG_TYPE_XY:
+                    // ESP_LOGI("XY", "222222222!");
+                    
+                    handle_tag_xy(&EPCFrame, &flag);
+                    break;
+                default:
+                    ESP_LOGI("Unknowed_company", "未知标签厂商!");
+                    break;
             }
 
-            ESP_LOGI(TAG,"%02x%02x:%.2f\r\n",EPCFrame.pData[2],EPCFrame.pData[3],(((int16_t)EPCFrame.pData[12]<<8|(int16_t)EPCFrame.pData[13])/100.0));
-
-            // printf("epcCnt:%d\r\n",epcCnt);
-            // free(EPCFrame.pData); //释放EPC数据帧的数据存储地址
-
-                // xSemaphoreGive(uart1_rx_xBinarySemaphore);//给予一次信息量
+            ESP_LOGI(TAG, "%02x%02x:%.2f\r\n",
+                     EPCFrame.pData[2], EPCFrame.pData[3],
+                     (((int16_t)EPCFrame.pData[12] << 8 | EPCFrame.pData[13]) / 100.0f));
 
             epc_read_speed++;
-            if(epc_read_speed > 800) 
-            {
-                epc_read_speed = 0;
+            if (epc_read_speed > 800) epc_read_speed = 0;
+
+            if (flag) {
+                xSemaphoreGive(mqtt_xBinarySemaphore);
+                flag = false;
             }
 
-            // xSemaphoreGive(xBinarySemaphore);     //给予一次信息量
-
-            if (flag){
-                xSemaphoreGive(mqtt_xBinarySemaphore);//给予一次信息量
-                flag=false;
-            }
-            free(EPCFrame.pData);//20250219
-                
+            free(EPCFrame.pData);
         }
-        vTaskDelay(100/portTICK_PERIOD_MS);
+
+        vTaskDelay(100 / portTICK_PERIOD_MS);
     }
+}
+
+void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr)
+{
+
+    // for(int j = 0; j < UARTRecvFrame.DataLen; j++) {
+    //     printf("[%d]%02X ",j, UARTRecvFrame.pData[j]);  // Print as hexadecimal
+    //     // Alternatively for ASCII: printf("%c", UARTRecvFrame.pData[j]);
+    // }
+    for (int index = 0; index < 120; index++) {
+        if (frame->pData[2] == 0 && frame->pData[3] == 0) break;
+
+        if (LTU3_Lable[index] == NULL) {
+            epcCnt++;
+            LTU3_Lable[index] = (EPC_Info_t *)malloc(sizeof(EPC_Info_t));
+            if (LTU3_Lable[index] == NULL) return;
+
+            LTU3_Lable[index]->epcId[0] = frame->pData[2];
+            LTU3_Lable[index]->epcId[1] = frame->pData[3];
+            LTU3_Lable[index]->antID = frame->pData[6];
+            LTU3_Lable[index]->rssi = frame->pData[8];
+            int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
+            float temp = raw_temp / 100.0f;
+
+            LTU3_Lable[index]->tempe = raw_temp;
+            LTU3_Lable[index]->last_temp = temp;
+            LTU3_Lable[index]->filtered_tempe = temp;
+            sprintf((char *)modbusRtuDataTAB[index], "%x%x:%.2f  ",
+                    LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1], temp);
+
+            *flag_ptr = true;
+            break;
+        }
+
+        if (LTU3_Lable[index]->epcId[0] == frame->pData[2] &&
+            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {
+
+            int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
+            float new_temp = raw_temp / 100.0f;
+            float old_temp = LTU3_Lable[index]->filtered_tempe;
+            LTU3_Lable[index]->last_temp = old_temp;
+
+            float filtered_temp = ALPHA * new_temp + (1 - ALPHA) * old_temp;
+            LTU3_Lable[index]->filtered_tempe = filtered_temp;
+            LTU3_Lable[index]->tempe = filtered_temp * 100.0f;
+
+            LTU3_Lable[index]->antID = frame->pData[6];
+            LTU3_Lable[index]->rssi = frame->pData[8];
+
+            uint8_t abs_err_temp = fabsf(filtered_temp - old_temp);
+            if (abs_err_temp >= err_value) {
+                ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
+                         LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
+                         old_temp, filtered_temp, abs_err_temp);
+                *flag_ptr = true;
+            }
+
+            sprintf((char *)modbusRtuDataTAB[index], "%x%x:%.2f  ",
+                    LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1], filtered_temp);
+            break;
+        }
+    }
+}
+
+void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
+{
+    // 与YH相似，这里可以自定义不同的温度处理逻辑
+    // 暂时复用相同逻辑，后期可以加不同滤波系数或结构
+    // handle_tag_yh(frame, flag_ptr);
+
+    // for(int j = 0; j < UARTRecvFrame.DataLen; j++) {
+    //     printf("[%d]%02X ",j, UARTRecvFrame.pData[j]);  // Print as hexadecimal
+    //     // Alternatively for ASCII: printf("%c", UARTRecvFrame.pData[j]);
+    // }
+    for (int index = 0; index < 120; index++) {
+        if (frame->pData[2] == 0 && frame->pData[3] == 0) break;
+
+        if (LTU3_Lable[index] == NULL) {
+            epcCnt++;
+            LTU3_Lable[index] = (EPC_Info_t *)malloc(sizeof(EPC_Info_t));
+            if (LTU3_Lable[index] == NULL) return;
+
+            LTU3_Lable[index]->epcId[0] = frame->pData[2];
+            LTU3_Lable[index]->epcId[1] = frame->pData[3];
+            LTU3_Lable[index]->antID = frame->pData[10];
+            LTU3_Lable[index]->rssi = frame->pData[12];
+
+
+            uint16_t adc = ((frame->pData[4] <<8)| frame->pData[5]);    // ADC 原始值
+            uint16_t cali = ((frame->pData[6]<<8) | frame->pData[7]);   // 校准值（高4位为标志位，低12位为C）
+
+            double temperature = calculate_temperature(adc, cali);    
+            // printf("temp:%0.2f\n",temperature);
+            // int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
+            float temp = temperature;
+
+            LTU3_Lable[index]->tempe = (uint16_t)(temperature*100);
+            LTU3_Lable[index]->last_temp = temp;
+            LTU3_Lable[index]->filtered_tempe = temp;
+            sprintf((char *)modbusRtuDataTAB[index], "%x%x:%.2f  ",
+                    LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1], temp);
+
+            *flag_ptr = true;
+            break;
+        }
+
+        if (LTU3_Lable[index]->epcId[0] == frame->pData[2] &&
+            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {
+
+            // int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
+            uint16_t adc = ((frame->pData[4]<<8) | frame->pData[5]);    // ADC 原始值
+            uint16_t cali = ((frame->pData[6]<<8) | frame->pData[7]);   // 校准值（高4位为标志位，低12位为C）
+            
+            // printf("ADC (Raw): 0x%04X\n", adc);          // Print as 4-digit hex
+            // printf("Calibration: 0x%04X\n", cali);       // Print as 4-digit hex
+
+            double temperature = calculate_temperature(adc, cali);  
+            // printf("temp:%0.2f\n",temperature);
+
+            float new_temp = temperature;
+            float old_temp = LTU3_Lable[index]->filtered_tempe;
+            LTU3_Lable[index]->last_temp = old_temp;
+
+            float filtered_temp = ALPHA * new_temp + (1 - ALPHA) * old_temp;
+            LTU3_Lable[index]->filtered_tempe = filtered_temp;
+            LTU3_Lable[index]->tempe = (uint16_t)(filtered_temp*100);
+
+            LTU3_Lable[index]->antID = frame->pData[10];
+            LTU3_Lable[index]->rssi = frame->pData[12];
+
+            uint8_t abs_err_temp = fabsf(filtered_temp - old_temp);
+            if (abs_err_temp >= err_value) {
+                ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
+                         LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
+                         old_temp, filtered_temp, abs_err_temp);
+                *flag_ptr = true;
+            }
+
+            sprintf((char *)modbusRtuDataTAB[index], "%x%x:%.2f  ",
+                    LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1], filtered_temp);
+            break;
+        }
+    }
+
+}
+
+
+// 计算温度函数
+double calculate_temperature(uint16_t adc_raw, uint16_t cali_raw) {
+    int16_t C = (cali_raw & 0x0FFF);
+    int16_t Cali = C - 256;
+
+    double x = ((int16_t)adc_raw - Cali) / 100.0 + 10.0;
+
+    double x2 = x * x;
+    double x3 = x2 * x;
+    double T = P1 * x3 + P2 * x2 + P3 * x + P4;
+    return T;
+}
+
+
+TagType get_tag_type(uint8_t *data, uint16_t dataLen) {
+    if (dataLen == 0x13 && data[0] == 0x00 && data[1] == 0x02) {
+        return TAG_TYPE_YH;
+    } else if (dataLen == 0x12 && data[0] == 0x00 && data[1] == 0x06) {
+        return TAG_TYPE_XY;
+    }
+    return TAG_TYPE_UNKNOWN;
 }
 
 

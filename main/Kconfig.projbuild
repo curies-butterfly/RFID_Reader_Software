@@ -74,7 +74,7 @@ menu "RFID Reader Config"
 
         config ESP_WIFI_AP_PASSWORD
             string "WiFi AP Password"
-            default "mypwd"
+            default "mypassword"
             help
                 WiFi password of the AP for the example to use.
 
@@ -105,7 +105,7 @@ menu "RFID Reader Config"
     
             config ESP_WIFI_REMOTE_AP_PASSWORD
                 string "WiFi Remote AP Password"
-                default "stapwd"
+                default "stapassword"
                 help
                     WiFi password for the example to use.
     

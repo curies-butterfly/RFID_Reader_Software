@@ -107,6 +107,16 @@ typedef struct
     uint32_t read_interval_time;
 }rfid_read_config_t;
 
+extern uint8_t type_epc;
+
+typedef enum {
+    TAG_TYPE_UNKNOWN = 0,
+    TAG_TYPE_YH,
+    TAG_TYPE_XY
+} TagType;//标签类型 0:未知 1:悦和标签 2:星沿标签 
+extern TagType tagType;
+
+
 #define  RFID_SendBytes(data,size) uart1_SendBytes(data,size) //串口数据发送接口
 
 extern EPC_Info_t  *LTU3_Lable[];  //
@@ -139,5 +149,10 @@ void RFID_ReadEpcTask(void *arg);
 extern SemaphoreHandle_t xBinarySemaphore;
 extern SemaphoreHandle_t mqtt_xBinarySemaphore;
 extern SemaphoreHandle_t xBinarySemaphore_clear;
+
+TagType get_tag_type(uint8_t *data, uint16_t dataLen);
+double calculate_temperature(uint16_t adc_raw, uint16_t cali_raw);
+void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr);
+void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr);
 
 #endif

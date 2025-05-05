@@ -68,10 +68,28 @@
         "math.h": "c",
         "string_view": "c",
         "span": "c",
-        "chry_ringbuffer.h": "c"
+        "chry_ringbuffer.h": "c",
+        "esp_wifi.h": "c",
+        "random": "cpp",
+        "esp_mac.h": "c",
+        "esp_flash.h": "c",
+        "esp_intr_alloc.h": "c",
+        "esp_attr.h": "c",
+        "esp_log.h": "c",
+        "esp_event.h": "c",
+        "esp_rom_gpio.h": "c",
+        "gpio_etm.h": "c",
+        "oleddisplay.h": "c",
+        "tp1107.h": "c",
+        "algo_array_queue.h": "c",
+        "at_utils.h": "c",
+        "typeinfo": "c",
+        "cstdio": "c",
+        "cmath": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "idf.portWin": "COM54",
     "C_Cpp.dimInactiveRegions": false,
-    "editor.fontSize": 25
+    "editor.fontSize": 25,
+    "idf.pythonInstallPath": "/home/hjie/.espressif/python_env/idf5.2_py3.10_env/bin/python"
 }
