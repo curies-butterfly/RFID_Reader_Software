@@ -38,11 +38,6 @@ menu "RFID Reader Config"
 
     endchoice
 
-                
-
-   
-
-
 
     choice SYS_NET_COMMUNICATION_PROTOCOL
         prompt "system networking communication protocol "
@@ -68,13 +63,13 @@ menu "RFID Reader Config"
 
         config ESP_WIFI_AP_SSID
             string "WiFi AP SSID"
-            default "myssid"
+            default "RFID_Reader_AP"
             help
                 SSID (network name) of the AP for the example to connect to.
 
         config ESP_WIFI_AP_PASSWORD
             string "WiFi AP Password"
-            default "mypassword"
+            default "12345678"
             help
                 WiFi password of the AP for the example to use.
 

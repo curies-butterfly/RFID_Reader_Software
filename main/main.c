@@ -76,6 +76,8 @@ size_t str_size = sizeof(str);
 char *strcop="mqtt://101.37.253.97:4635";
 /*      end             */
 
+#define NB_FLAGS   0  // AT+UNBSEND 的 flags 参数
+
 // // 定义事件组句柄
 // static EventGroupHandle_t xEventGroup;
 
@@ -132,6 +134,53 @@ void rfidModuleInit()
         printf("RFID stop read error\r\n");
 }
 
+/**
+ * send_data:json转十六进制字符串
+ */
+static char *ascii_to_hex(const char *ascii)
+{
+    if (!ascii) return NULL;
+
+    size_t ascii_len = strlen(ascii);
+    char *hex = (char *)malloc(ascii_len * 2 + 1);
+    if (!hex) return NULL;
+
+    for (size_t i = 0; i < ascii_len; i++) {
+        sprintf(&hex[i * 2], "%02X", (unsigned char)ascii[i]);
+    }
+    hex[ascii_len * 2] = '\0';
+    return hex;
+}
+
+static void send_json_over_nb(const char *json_str)
+{
+    if (!json_str) return;
+
+    char *hex_str = ascii_to_hex(json_str);
+    if (!hex_str) {
+        printf("[send_json_over_nb] malloc hex_str failed\n");
+        return;
+    }
+
+    size_t json_len = strlen(json_str);
+    size_t at_cmd_len = json_len * 2 + 40;
+
+    char *at_cmd = (char *)malloc(at_cmd_len);
+    if (!at_cmd) {
+        printf("[send_json_over_nb] malloc at_cmd failed\n");
+        free(hex_str);
+        return;
+    }
+
+    snprintf(at_cmd, at_cmd_len, "AT+UNBSEND=%zu,%s,%d\r\n", json_len, hex_str, NB_FLAGS);
+
+    uart_write_bytes(UART_NUM_2, at_cmd, strlen(at_cmd));
+
+    printf("[send_json_over_nb] send: %s", at_cmd);
+
+    free(at_cmd);
+    free(hex_str);
+}
 
 void mqtt_publish_epc_data()
 {
@@ -176,7 +225,6 @@ void mqtt_publish_epc_data()
     {
         mqtt_client_publish(send_topic, json_str, size, 0, 1);
     }
-   
     free(json_str);
     
 }
@@ -220,6 +268,7 @@ void mqtt_publish_epc_data2()
     if (epcCnt != 0) //有数据才上报
     {
         mqtt_client_publish(send_topic, json_str2, size2, 0, 1);
+        send_json_over_nb(json_str2);
     }
    
     free(json_str2);
@@ -267,9 +316,6 @@ void RFID_MqttTimeTask(void *arg)
     }
  
 }
-
-
-
 void RFID_MqttErrTask(void *arg)
 {
     while(1)
@@ -291,16 +337,13 @@ void RFID_MqttErrTask(void *arg)
         }
 
         mqtt_publish_epc_data();
-
         // // 完成发送后，清除事件组标志位，允许任务一执行
         // xEventGroupClearBits(xEventGroup, TASK_2_EVENT_BIT);
         // // 任务二完成后设置任务一的标志位，允许任务一执行
         // xEventGroupSetBits(xEventGroup, TASK_1_EVENT_BIT);
     
-
         vTaskDelay(pdMS_TO_TICKS(500));
         // }
-       
         // MQTT把json数据发送服务器
     }
  
@@ -330,12 +373,12 @@ void ctrl_rfid_mode(uint8_t mode){
     }
 
 }
+
 void oled_data_display(OLEDDisplay_t *oled){
   //ID:########
   //温度：38℃ 
   //运行状态：正常/异常
 
-  
   sprintf(oled_number, "%2d", temp);
   OLEDDisplay_clear(oled);
   //________________第一行ID_______________
@@ -379,8 +422,6 @@ void app_main(void)
 
     esp_err_t ret = nvs_flash_init();//nvs初始化
 
-   
-
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         //若由于分区版本更新或无可用页(存储空间不足)，尝试格式化并重新初始化
         /* NVS partition was truncated and needs to be erased
@@ -389,6 +430,7 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
     
+
     // //nvs写入操作
     // nvs_handle_t my_handle;//nvs句柄
     // ret=nvs_open("storage",NVS_READWRITE,&my_handle);
@@ -428,6 +470,36 @@ void app_main(void)
     }
 
     */
+    //设置读写标签类型 悦和 星沿
+    char label_mode_str[16] = {0};       // 当前 NVS 中的值
+    size_t str_size = sizeof(label_mode_str);
+    esp_err_t err = from_nvs_get_value("label_mode", label_mode_str, &str_size);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "label_mode from NVS: %s", label_mode_str);
+    
+        // 根据字符串设置 type_epc
+        if (strcmp(label_mode_str, "YH") == 0) {
+            type_epc = 1;
+        } else if (strcmp(label_mode_str, "XY") == 0) {
+            type_epc = 2;
+        } else {
+            type_epc = 0;
+        }
+    
+        ESP_LOGI(TAG, "type_epc set to: %d", type_epc);
+    
+    } else {
+        ESP_LOGW(TAG, "label_mode not found, setting default to 'YH'");
+        // 如果没读到，说明不存在，写入默认值
+        err = from_nvs_set_value("label_mode", "YH");
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "Successfully set default label_mode to: YH");
+            type_epc = 1; // 默认值设为 YH 对应的 type_epc
+        } else {
+            ESP_LOGE(TAG, "Failed to set default label_mode: %s", esp_err_to_name(err));
+            type_epc = 0;
+        }
+    }
 
     /* Initialize default TCP/IP stack */
     ESP_ERROR_CHECK(esp_netif_init());//初始化网络接口
@@ -449,6 +521,8 @@ void app_main(void)
     // sys_info_config.tcp_address="123.60.157.221";
     // sys_info_config.tcp_port=1883;
 
+    ESP_LOGI("Type_EPC","type_epc = %d\n", type_epc);
+
     network_init();
     wdt_hal_feed(&rwdt_ctx); //4G初始化有点长，先喂一次狗
     mqtt_init();
@@ -461,6 +535,8 @@ void app_main(void)
     // // iic_init();
     // modBusRtu_Init();
 
+    unb_tp1107_init();//tp1107初始化
+
     // xEventGroup = xEventGroupCreate();
     // if (xEventGroup == NULL) {
     //     ESP_LOGE("app_main", "Event group creation failed!");
@@ -468,18 +544,15 @@ void app_main(void)
     // }
     // xEventGroupSetBits(xEventGroup, TASK_2_EVENT_BIT);
 
- 
     xTaskCreate(rx_task, "u1_rx_task", 4096*2, NULL,configMAX_PRIORITIES-2, NULL); 
     // xTaskCreate(modbusRtuRx_task, "modbusRtuRx_task", 4096*3, NULL,configMAX_PRIORITIES-3, NULL); 
     // xTaskCreate(modbusRtuDeal_Task, "modbusRtuDeal_Task", 4096*3, NULL,configMAX_PRIORITIES-3, NULL);
 
     xTaskCreate(RFID_ReadEpcTask, "RFID_ReadEpcTask", 4096*2, NULL,configMAX_PRIORITIES-4, NULL);
     
-    // xTaskCreate(RFID_MqttTimeTask, "RFID_MqttTimeTask", 4096*2, NULL,configMAX_PRIORITIES-5, NULL);
+    xTaskCreate(RFID_MqttTimeTask, "RFID_MqttTimeTask", 4096*2, NULL,configMAX_PRIORITIES-5, NULL);
     // xTaskCreate(RFID_MqttErrTask, "RFID_MqttErrTask", 4096*2, NULL,configMAX_PRIORITIES-5, NULL);
  
-
-
     // xTaskCreate(modbusRtuDeal_Task, "modbusRtuDeal_Task", 4096*2, NULL,configMAX_PRIORITIES-6, NULL);
 
     wdt_hal_feed(&rwdt_ctx);//喂一次狗
@@ -509,7 +582,6 @@ void app_main(void)
     // ant_sel[2]="3";
     // ant_sel[3]="4";
    
-
     // interval_time[0]="200";
     // interval_time[1]="250";
     // interval_time[2]="300";
@@ -536,16 +608,34 @@ void app_main(void)
     // vTaskDelay(1000 / portTICK_PERIOD_MS); // 延迟 1 秒
 
     ctrl_rfid_mode(2);
+    // const char *json_data = "{\"status\":\"200\",\"epc_cnt\":\"2\",\"read_rate\":\"20\",\"data\":[{\"epc\":\"2613\",\"tem\":26.58,\"ant\":4,\"rssi\":88},{\"epc\":\"061e\",\"tem\":21.98,\"ant\":4,\"rssi\":53}]}";
+    // char hex_data[1024] = {0};
+    // json_to_hex_str(json_data, hex_data);
+    // size_t json_len = strlen(json_data);  // 注意是原始长度（字节）
 
+    // ESP_LOGI(TAG, "Original JSON (%d bytes): %s", json_len, json_data);
+    // ESP_LOGI(TAG, "Hex encoded JSON: %s", hex_data);
+
+    // // 构造 AT 命令
+    // char at_cmd[512] = {0};
+    // snprintf(at_cmd, sizeof(at_cmd), "AT+UNBSEND=%d,%s,0\r\n", json_len, hex_data);
+    // snprintf(at_cmd, sizeof(at_cmd), "AT+UNBSEND=5,0123456789,0\r\n");
+    // ESP_LOGI(TAG, "Sending AT command:\n%s", at_cmd);
+
+    //发送命令
+    // uart_write_bytes(UART_PORT, at_cmd, strlen(at_cmd));
 
     while(1)
     {
         wdt_hal_feed(&rwdt_ctx);
-        
-
-
-
+    
+        // esp_err_t err = from_nvs_get_value("label_mode", label_mode_str, &str_size);
+        // ESP_LOGI(TAG, "label_mode from NVS: %s", label_mode_str);
+        // uart_write_bytes(UART_NUM_2, at_cmd, strlen(at_cmd));
         printf("free heap size: %d\r\n",xPortGetFreeHeapSize());
+        
+        // uart_write_bytes(UART_NUM_2, at_cmd, strlen(at_cmd));
+ 
 
         // RFID_ShowEpc(LTU3_Lable);
         // SHT30_read_result(0x44, &sht30_data);
@@ -564,7 +654,7 @@ void app_main(void)
 }
 
     // unb_tp1107_init();
- // const char *json_data = "{\"status\":\"200\",\"epc_cnt\":\"2\",\"read_rate\":\"20\",\"data\":[{\"epc\":\"2613\",\"tem\":26.58,\"ant\":4,\"rssi\":88},{\"epc\":\"061e\",\"tem\":21.98,\"ant\":4,\"rssi\":53}]}";
+    // const char *json_data = "{\"status\":\"200\",\"epc_cnt\":\"2\",\"read_rate\":\"20\",\"data\":[{\"epc\":\"2613\",\"tem\":26.58,\"ant\":4,\"rssi\":88},{\"epc\":\"061e\",\"tem\":21.98,\"ant\":4,\"rssi\":53}]}";
 
     // char hex_data[1024] = {0};
     // json_to_hex_str(json_data, hex_data);

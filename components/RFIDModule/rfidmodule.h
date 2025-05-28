@@ -5,7 +5,7 @@
 #include "rfidcommon.h"
 #include "modbus_rtu.h"
 
-#define ALPHA 0.5f // α=0.2，可根据实际噪声调整（0.1~0.5）一阶低通滤波
+#define ALPHA 0.95f // α=0.2， 一阶低通滤波
 
 //基本数据帧
 typedef struct 
@@ -16,9 +16,8 @@ typedef struct
     uint8_t  *pData;        //数据
     uint16_t CRCValu;       //CRC 校验
 }BaseDataFrame_t;
-
-
 extern BaseDataFrame_t  UARTRecvFrame;
+
 extern uint8_t frameDealFlag; 
 
 //频段列表结构体
@@ -66,12 +65,12 @@ typedef struct
 //读LTU3 温度标签信息
 typedef struct 
 {
-    uint8_t epcId[3];   // EPCID
-    int16_t tempe;      // 温度数据 
-    uint8_t antID;      //天线号
-    uint8_t rssi;       //信号质量
-    uint8_t del_flag;   //
-    float last_temp;//上一次发送的温度值
+    uint8_t epcId[3];       // EPCID
+    int16_t tempe;          // 温度数据 
+    uint8_t antID;          //天线号
+    uint8_t rssi;           //信号质量
+    uint8_t del_flag;       //
+    float last_temp;        //上一次发送的温度值
     float filtered_tempe;   // 滤波后的温度值
 }EPC_Info_t;
 

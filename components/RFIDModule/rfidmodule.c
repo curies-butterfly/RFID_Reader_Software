@@ -35,7 +35,8 @@ rfid_read_config_t rfid_read_config = {
     .read_interval_time = 1000,
 };
 
-uint8_t type_epc= TAG_TYPE_XY;//默认悦和 TAG_TYPE_YH
+#define EXAMPLE_ESP_Label_Mode      CONFIG_Label_Mode
+uint8_t type_epc;
 /*****************************************************
 函数名称：void ClearRecvFlag()
 函数功能：清除接收标志
@@ -122,11 +123,11 @@ void RFID_SendBaseFrame(BaseDataFrame_t BaseDataFrame)
 
     // ESP_LOGE("EPC_READ!!!:%x",(char*)SendBuff);
      // 打印SendBuff内容
-     printf("SendBuff Content (Hex):!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ");
-     for(int i = 0; i < index; i++) {
-         printf("%02X ", SendBuff[i]);  // 以16进制格式打印每个字节
-     }
-     printf("\n");
+    //  printf("SendBuff Content (Hex):!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ");
+    //  for(int i = 0; i < index; i++) {
+    //      printf("%02X ", SendBuff[i]);  // 以16进制格式打印每个字节
+    //  }
+    //  printf("\n");
     RFID_SendBytes((char*)SendBuff,(size_t)index);
     free(SendBuff); 
 }
@@ -735,25 +736,26 @@ void RFID_ReadEpcTask(void *arg)
             switch (tagType) {
                 case TAG_TYPE_YH:
                     // ESP_LOGI("YH", "111111111!");
-                   
+                    
                     handle_tag_yh(&EPCFrame, &flag);
+                    ESP_LOGI(TAG, "%02x%02x:%.2f\r\n",
+                        EPCFrame.pData[2], EPCFrame.pData[3],
+                        (((int16_t)EPCFrame.pData[12] << 8 | EPCFrame.pData[13]) / 100.0f));
                     break;
                 case TAG_TYPE_XY:
                     // ESP_LOGI("XY", "222222222!");
                     
                     handle_tag_xy(&EPCFrame, &flag);
+                    
                     break;
                 default:
                     ESP_LOGI("Unknowed_company", "未知标签厂商!");
                     break;
             }
 
-            ESP_LOGI(TAG, "%02x%02x:%.2f\r\n",
-                     EPCFrame.pData[2], EPCFrame.pData[3],
-                     (((int16_t)EPCFrame.pData[12] << 8 | EPCFrame.pData[13]) / 100.0f));
-
             epc_read_speed++;
             if (epc_read_speed > 800) epc_read_speed = 0;
+
 
             if (flag) {
                 xSemaphoreGive(mqtt_xBinarySemaphore);
@@ -856,7 +858,10 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
             uint16_t adc = ((frame->pData[4] <<8)| frame->pData[5]);    // ADC 原始值
             uint16_t cali = ((frame->pData[6]<<8) | frame->pData[7]);   // 校准值（高4位为标志位，低12位为C）
 
-            double temperature = calculate_temperature(adc, cali);    
+            double temperature = calculate_temperature(adc, cali);   
+            
+            if (temperature<-10.00) break;
+            
             // printf("temp:%0.2f\n",temperature);
             // int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             float temp = temperature;
@@ -883,12 +888,14 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
 
             double temperature = calculate_temperature(adc, cali);  
             // printf("temp:%0.2f\n",temperature);
+            
+            if (temperature<-10.00) break;
 
             float new_temp = temperature;
             float old_temp = LTU3_Lable[index]->filtered_tempe;
             LTU3_Lable[index]->last_temp = old_temp;
 
-            float filtered_temp = ALPHA * new_temp + (1 - ALPHA) * old_temp;
+            float filtered_temp = ALPHA * new_temp + (1 - ALPHA) * old_temp;//低通滤波
             LTU3_Lable[index]->filtered_tempe = filtered_temp;
             LTU3_Lable[index]->tempe = (uint16_t)(filtered_temp*100);
 
@@ -896,6 +903,11 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
             LTU3_Lable[index]->rssi = frame->pData[12];
 
             uint8_t abs_err_temp = fabsf(filtered_temp - old_temp);
+
+            ESP_LOGI(TAG, "%02x%02x:%.2f\r\n",
+                LTU3_Lable[index]->epcId[0] ,  LTU3_Lable[index]->epcId[1],filtered_temp
+                );     
+
             if (abs_err_temp >= err_value) {
                 ESP_LOGI(TAG, "epcID:%02x%02x, last: %.1f, now: %.1f, err: %d",
                          LTU3_Lable[index]->epcId[0], LTU3_Lable[index]->epcId[1],
@@ -934,10 +946,4 @@ TagType get_tag_type(uint8_t *data, uint16_t dataLen) {
     }
     return TAG_TYPE_UNKNOWN;
 }
-
-
-
-
-
-
 

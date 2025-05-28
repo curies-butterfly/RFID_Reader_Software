@@ -32,8 +32,13 @@ static const char *COMMAND_RESPS[] = { "TP1107", "FF", "joined", "UL", "NONE" };
 
 #define  TP1107_DEVICE_NAME "tp1107"
 #define  TP1107_CLIENT_NAME "uart2"
+
+//28
 #define  TP1107_RST_PIN 35
+
+//29
 #define  TP1107_WAKE_PIN 36
+
 #define  TP1107_DEFAUT_ESN "FF01FFFF0000"
 
 #define UNB_DOUBLE 0
@@ -74,7 +79,7 @@ at_device_tp1107 tp1107 = {
     TP1107_DEFAUT_ESN,
     NULL,
     NULL };
-
+    
 /**
  * @brief URC回调函数
  * 
@@ -411,7 +416,10 @@ RESTART:
         vTaskDelay(1000 / portTICK_PERIOD_MS); // 毫秒转时钟周期
         if (join_tick > 20) {
             vTaskDelay(3000 / portTICK_PERIOD_MS);
-            uart_write_bytes(UART_NUM_2, (const uint8_t*)GO_AT_MODE, sizeof(DEF_DEFAUT)-1);
+            uart_write_bytes(UART_NUM_2, (const uint8_t*)GO_AT_MODE, sizeof(GO_AT_MODE)-1);
+
+            vTaskDelay(1000 / portTICK_PERIOD_MS); // 毫秒转时钟周期
+            uart_write_bytes(UART_NUM_2, (const uint8_t*)DEF_DEFAUT, sizeof(DEF_DEFAUT)-1);
             goto RESTART;
         }
         join_tick++;

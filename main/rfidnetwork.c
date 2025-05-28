@@ -85,8 +85,8 @@ static EventGroupHandle_t s_wifi_event_group;
 // 定义全局变量以确保生命周期
 static char *lwt_msg = NULL;
 
-int pushtime_count = 10000;//默认600s 10min
-int err_value = 3;//默认3
+int pushtime_count = 10000;
+int err_value = 1;//默认1
 
 #define INIT_SPI_ETH_MODULE_CONFIG(eth_module_config, num)                                      \
     do {                                                                                        \
