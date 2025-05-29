@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2023-2024 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2023-2025 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -22,15 +22,8 @@
 #include "esp_modem_dce_common_commands.h"
 #include "usbh_modem_board.h"
 
-
-// #include "hal/wdt_hal.h"//watchdog 新增
-
-
 static const char *TAG = "modem_board";
 ESP_EVENT_DEFINE_BASE(MODEM_BOARD_EVENT);
-
-
-// static const int MODEM_TASK_EXIT_BIT = BIT9;  // 新增 标志位
 
 #define MODEM_CHECK_GOTO(a, str, goto_tag, ...)                                       \
         if (!(a))                                                                     \
@@ -59,17 +52,18 @@ ESP_EVENT_DEFINE_BASE(MODEM_BOARD_EVENT);
 
 /* user event */
 static const int MODEM_DESTROY_BIT                = BIT0;    /* destroy modem daemon task, trigger by user, clear by daemon task */
-static const int PPP_NET_MODE_ON_BIT              = BIT1;    /* dte usb reconnect event, trigger by user, clear by daemon task */
-static const int PPP_NET_MODE_OFF_BIT             = BIT2;    /* dte usb disconnect event, trigger by user, clear by hardware */
-static const int PPP_NET_AUTO_SUSPEND_USER_BIT    = BIT3;    /* suspend ppp net auto reconnect, trigger by user, clear by user */
+static const int MODEM_DESTROY_DONE_BIT           = BIT1;    /* modem daemon task destroy done, trigger by daemon task, clear by user */
+static const int PPP_NET_MODE_ON_BIT              = BIT2;    /* dte usb reconnect event, trigger by user, clear by daemon task */
+static const int PPP_NET_MODE_OFF_BIT             = BIT3;    /* dte usb disconnect event, trigger by user, clear by hardware */
+static const int PPP_NET_AUTO_SUSPEND_USER_BIT    = BIT4;    /* suspend ppp net auto reconnect, trigger by user, clear by user */
 /* net event */
-static const int PPP_NET_CONNECT_BIT              = BIT4;    /* ppp net got ip, trigger by lwip, clear by lwip or daemon task */
-static const int PPP_NET_DISCONNECT_BIT           = BIT5;    /* ppp net loss ip, trigger by lwip, clear by lwip */
+static const int PPP_NET_CONNECT_BIT              = BIT5;    /* ppp net got ip, trigger by lwip, clear by lwip or daemon task */
+static const int PPP_NET_DISCONNECT_BIT           = BIT6;    /* ppp net loss ip, trigger by lwip, clear by lwip */
 /* usb event */
-static const int DTE_USB_DISCONNECT_BIT           = BIT6;    /* dte usb disconnect event, trigger by hardware, clear by daemon task */
-static const int DTE_USB_RECONNECT_BIT            = BIT7;    /* dte usb reconnect event, trigger by hardware or user, clear by daemon task */
+static const int DTE_USB_DISCONNECT_BIT           = BIT7;    /* dte usb disconnect event, trigger by hardware, clear by daemon task */
+static const int DTE_USB_RECONNECT_BIT            = BIT8;    /* dte usb reconnect event, trigger by hardware or user, clear by daemon task */
 /* daemon task internal event bit */
-static const int PPP_NET_RECONNECTING_BIT         = BIT8;    /* ppp net reconnecting, trigger by daemon task, clear by daemon task */
+static const int PPP_NET_RECONNECTING_BIT         = BIT9;    /* ppp net reconnecting, trigger by daemon task, clear by daemon task */
 
 static esp_modem_dce_t *s_dce = NULL;
 static EventGroupHandle_t s_modem_evt_hdl = NULL;
@@ -237,7 +231,7 @@ err:
 
 }
 
-static esp_err_t modem_board_deinit(esp_modem_dce_t *dce)
+static esp_err_t modem_board_dce_deinit(esp_modem_dce_t *dce)
 {
     modem_board_t *board = __containerof(dce, modem_board_t, parent);
     if (board->power_pin) {
@@ -270,7 +264,7 @@ static esp_modem_dce_t *modem_board_create(esp_modem_dce_config_t *config)
     board->power_down = modem_board_power_down;
     board->re_sync = esp_modem_recov_resend_new(&board->parent, board->parent.sync, my_recov, 5, 5);
     //overwrite default function
-    board->parent.deinit = modem_board_deinit;
+    board->parent.deinit = modem_board_dce_deinit;
     board->parent.start_up = modem_board_start_up;
 
     return &board->parent;
@@ -405,300 +399,6 @@ static bool _ppp_network_stop(esp_modem_dte_t *dte)
     }
     return false;
 }
-
-//新增 修改了原来的任务函数
-// static void _modem_daemon_task(void *param)
-// {
-//     modem_config_t *config = (modem_config_t *)param;
-//     ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-//     //强制复位 如果需要
-//     if ((config->flags & MODEM_FLAGS_INIT_NOT_FORCE_RESET) == 0) {
-//         modem_board_force_reset();
-//     }
-
-//     wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
-//     wdt_hal_write_protect_disable(&rwdt_ctx);
-//     wdt_hal_feed(&rwdt_ctx);//4G初始化有点长，先喂一次狗
-//     // init the USB DTE
-
-//     esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
-//     dte_config.rx_buffer_size = config->rx_buffer_size; //rx ringbuffer for usb transfer
-//     dte_config.tx_buffer_size = config->tx_buffer_size; //tx ringbuffer for usb transfer
-//     dte_config.line_buffer_size = config->line_buffer_size;
-//     dte_config.event_task_stack_size = config->event_task_stack_size; //task to handle usb rx data
-//     dte_config.event_task_priority = config->event_task_priority; //task to handle usb rx data
-//     dte_config.conn_callback = _usb_dte_conn_callback;
-//     dte_config.disconn_callback = _usb_dte_disconn_callback;
-
-//     esp_modem_dce_config_t dce_config = ESP_MODEM_DCE_DEFAULT_CONFIG(CONFIG_MODEM_PPP_APN);
-//     esp_netif_config_t ppp_netif_config = ESP_NETIF_DEFAULT_PPP();
-
-//     // Initialize esp-modem units, DTE, DCE, ppp-netif
-//     esp_modem_dte_t *dte = esp_modem_dte_new(&dte_config);
-//     assert(dte != NULL);
-//     esp_modem_dce_t *dce = modem_board_create(&dce_config);
-//     assert(dce != NULL);
-//     esp_netif_t *ppp_netif = esp_netif_new(&ppp_netif_config);
-//     assert(ppp_netif != NULL);
-
-//     /* attach driver to ppp interface, start DTE handling */
-//     s_dce = dce;
-//     ESP_ERROR_CHECK(esp_modem_default_attach(dte, dce, ppp_netif));
-
-//     // 检查 SIM 卡状态
-//     if (!_check_sim_card()) {
-//         ESP_LOGE(TAG, "SIM card not detected or invalid, exiting modem daemon task!");
-//         esp_event_post(MODEM_BOARD_EVENT, MODEM_EVENT_SIMCARD_DISCONN, NULL, 0, 0);
-        
-//         // 设置任务退出标志，并清理资源
-//         xEventGroupSetBits(s_modem_evt_hdl, MODEM_TASK_EXIT_BIT); 
-      
-//         if (dce) dce->deinit(dce);
-//         if (ppp_netif) esp_netif_destroy(ppp_netif);
-        
-//         vTaskDelete(NULL);  // 直接退出任务
-//         return;
-//     }
-
-//     ESP_ERROR_CHECK(esp_modem_set_event_handler(dte, on_modem_event, ESP_EVENT_ANY_ID, NULL));
-//     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, on_modem_event, NULL));
-//     if (config->handler) {
-//         ESP_ERROR_CHECK(esp_event_handler_register(MODEM_BOARD_EVENT, ESP_EVENT_ANY_ID, config->handler, config->handler_arg));
-//     }
-//     int stage_retry_times = 0;
-//     int retry_after_ms = 0;
-//     const int RETRY_TIMEOUT = CONFIG_MODEM_DIAL_RETRY_TIMES;
-//     _modem_stage_t modem_stage = STAGE_SYNC;
-//     while (true) {
-//         /********************************** handle external event *********************************************************/
-//         EventBits_t bits = xEventGroupWaitBits(s_modem_evt_hdl, ( PPP_NET_MODE_ON_BIT | PPP_NET_MODE_OFF_BIT | DTE_USB_RECONNECT_BIT | DTE_USB_DISCONNECT_BIT | PPP_NET_RECONNECTING_BIT |
-//                                                PPP_NET_DISCONNECT_BIT | MODEM_DESTROY_BIT), pdFALSE, pdFALSE, portMAX_DELAY);
-//         ESP_LOGD(TAG, "Handling bits = %04X, stage = %d, retry = %d ", (unsigned int)bits, modem_stage, stage_retry_times);
-//         /* deamon task destroy */
-//         if (bits & MODEM_DESTROY_BIT) {
-//             break;
-//         }
-
-//         /* user trigger ppp start */
-//         if (bits & PPP_NET_MODE_ON_BIT) {
-//             if (modem_stage < STAGE_CHECK_SIM) {
-//                 modem_stage = STAGE_SYNC;
-//             } else {
-//                 xEventGroupClearBits(s_modem_evt_hdl, PPP_NET_MODE_ON_BIT);
-//             }
-//             stage_retry_times = 0;
-//         }
-
-//         /* user trigger ppp stop */
-//         if (bits & PPP_NET_MODE_OFF_BIT) {
-//             if (modem_stage > STAGE_START_PPP) {
-//                 modem_stage = STAGE_DTE_LOSS;
-//             } else {
-//                 modem_stage = STAGE_WAITING;
-//                 xEventGroupClearBits(s_modem_evt_hdl, PPP_NET_MODE_OFF_BIT);
-//             }
-//             stage_retry_times = 0;
-//         }
-
-//         /* usb dis-connect will trigger network pending */
-//         if (bits & DTE_USB_DISCONNECT_BIT) {
-//             if (modem_stage > STAGE_START_PPP) {
-//                 modem_stage = STAGE_DTE_LOSS;
-//             } else {
-//                 modem_stage = STAGE_WAITING;
-//                 xEventGroupClearBits(s_modem_evt_hdl, DTE_USB_DISCONNECT_BIT);
-//             }
-//             stage_retry_times = 0;
-//         }
-
-//         /* usb re-connect will trigger network re-dial after few seconds */
-//         if (bits & DTE_USB_RECONNECT_BIT) {
-//             ESP_LOGI(TAG, "DTE reconnect, reconnecting ...\n");
-//             /* add delay here to wait modem ready */
-//             for (size_t i = 0; i < MODEM_NET_RECONNECT_DELAY_S; i++) {
-//                 /* break the reconnect if reconnect withdraw or modem destroy */
-//                 if (((xEventGroupGetBits(s_modem_evt_hdl) & DTE_USB_RECONNECT_BIT) == 0)
-//                         || (xEventGroupGetBits(s_modem_evt_hdl) & MODEM_DESTROY_BIT)) {
-//                     break;
-//                 } else {
-//                     vTaskDelay(pdMS_TO_TICKS(1000));
-//                     ESP_LOGI(TAG, "reconnect after %ds...", MODEM_NET_RECONNECT_DELAY_S - i);
-//                 }
-//             }
-//             /* break the reconnect if reconnect withdraw or modem destroy */
-//             if (((xEventGroupGetBits(s_modem_evt_hdl) & DTE_USB_RECONNECT_BIT) == 0)
-//                     || (xEventGroupGetBits(s_modem_evt_hdl) & MODEM_DESTROY_BIT)) {
-//                 continue;
-//             }
-
-//             xEventGroupClearBits(s_modem_evt_hdl, (DTE_USB_RECONNECT_BIT | PPP_NET_CONNECT_BIT));
-//             if ((xEventGroupGetBits(s_modem_evt_hdl) & PPP_NET_AUTO_SUSPEND_USER_BIT) == 0) {
-//                 xEventGroupSetBits(s_modem_evt_hdl, PPP_NET_MODE_ON_BIT);
-//             }
-//             modem_stage = STAGE_SYNC;
-//             stage_retry_times = 0;
-//         }
-//         /* net disconnect will trigger ppp stop */
-//         if ((bits & PPP_NET_DISCONNECT_BIT) && modem_stage == STAGE_RUNNING) {
-//             if ((xEventGroupGetBits(s_modem_evt_hdl) & PPP_NET_AUTO_SUSPEND_USER_BIT) == 0) {
-//                 xEventGroupSetBits(s_modem_evt_hdl, PPP_NET_MODE_ON_BIT);
-//             }
-//             modem_stage = STAGE_STOP_PPP;
-//             stage_retry_times = 0;
-//         }
-
-//         /************************************ Stage Retry logic **********************************/
-//         const char *stare_str = MODEM_STAGE_STR(modem_stage);
-//         if (stage_retry_times >= RETRY_TIMEOUT) {
-//             //IF stage retry timeout, retry from start
-//             ESP_LOGE(TAG, "Modem state %s, retry %d, timeout !", stare_str, stage_retry_times);
-//             ESP_LOGW(TAG, "Retry From Start !");
-//             if (xEventGroupGetBits(s_modem_evt_hdl) & PPP_NET_RECONNECTING_BIT) {
-//                 xEventGroupClearBits(s_modem_evt_hdl, PPP_NET_RECONNECTING_BIT);
-//                 xEventGroupSetBits(s_modem_evt_hdl, PPP_NET_MODE_ON_BIT);
-//             }
-//             modem_stage = STAGE_SYNC;
-//             stare_str = MODEM_STAGE_STR(modem_stage);
-//             stage_retry_times = 0;
-//         } else if (stage_retry_times > 0) {
-//             ESP_LOGW(TAG, "Modem state %s, Failed, retry%d, after %dms...", stare_str, stage_retry_times, retry_after_ms);
-//             vTaskDelay(pdMS_TO_TICKS(retry_after_ms));
-//         }
-
-//         /************************************ Processing stage **********************************/
-//         wdt_hal_context_t rwdt_ctx = RWDT_HAL_CONTEXT_DEFAULT();
-//         wdt_hal_write_protect_disable(&rwdt_ctx);
-//         wdt_hal_feed(&rwdt_ctx);//4G初始化有点长，先喂一次狗
-        
-//         if (modem_stage != STAGE_WAITING) {
-//             ESP_LOGI(TAG, "Modem state %s, Start", stare_str);
-//         }
-//         switch (modem_stage) {
-//         case STAGE_DTE_LOSS:
-//             if (_ppp_network_stop(dte) != true) {
-//                 retry_after_ms = 3000;
-//                 ++stage_retry_times;
-//             } else {
-//                 modem_stage = STAGE_WAITING;
-//                 xEventGroupClearBits(s_modem_evt_hdl, DTE_USB_DISCONNECT_BIT);
-//                 xEventGroupClearBits(s_modem_evt_hdl, PPP_NET_MODE_OFF_BIT);
-//                 goto _stage_succeed;
-//             }
-//             break;
-//         case STAGE_WAITING:
-//             vTaskDelay(pdMS_TO_TICKS(100));
-//             break;
-//         case STAGE_SYNC:
-//             if (esp_modem_default_start(dte) != ESP_OK) {
-//                 retry_after_ms = 3000;
-//                 ++stage_retry_times;
-//             } else {
-//                 modem_stage = STAGE_WAITING;
-//                 if (xEventGroupGetBits(s_modem_evt_hdl) & PPP_NET_MODE_ON_BIT) {
-//                     xEventGroupClearBits(s_modem_evt_hdl, PPP_NET_MODE_ON_BIT);
-//                     ESP_LOGI(TAG, "Network Auto reconnecting ...");
-//                     esp_event_post(MODEM_BOARD_EVENT, MODEM_EVENT_NET_DISCONN, NULL, 0, 0);
-//                     xEventGroupSetBits(s_modem_evt_hdl, PPP_NET_RECONNECTING_BIT);
-//                     modem_stage = STAGE_CHECK_SIM;
-//                 }
-//                 goto _stage_succeed;
-//             }
-//             break;
-//         case STAGE_STOP_PPP:
-//             if (_ppp_network_stop(dte) != true) {
-//                 retry_after_ms = 3000;
-//                 ++stage_retry_times;
-//             } else {
-//                 modem_stage = STAGE_SYNC;
-//                 goto _stage_succeed;
-//             }
-//             break;
-//         case STAGE_CHECK_SIM:
-//             if (_check_sim_card() != true) {
-//                 retry_after_ms = 3000;
-//                 ++stage_retry_times;
-//                 // count_err++;
-//             } else {
-//                 modem_stage = STAGE_CHECK_SIGNAL;
-//                 goto _stage_succeed;
-//             }
-//             break;
-//         case STAGE_CHECK_SIGNAL:
-//             if (_check_signal_quality() != true)  {
-//                 retry_after_ms = 3000;
-//                 ++stage_retry_times;
-//             } else {
-//                 modem_stage = STAGE_CHECK_REGIST;
-//                 goto _stage_succeed;
-//             }
-//             break;
-//         case STAGE_CHECK_REGIST:
-//             if (_check_network_registration() != true)  {
-//                 retry_after_ms = 3000;
-//                 ++stage_retry_times;
-//             } else {
-//                 modem_stage = STAGE_START_PPP;
-//                 goto _stage_succeed;
-//             }
-//             break;
-//         case STAGE_START_PPP:
-//             if (_ppp_network_start(dte) != true)  {
-//                 retry_after_ms = 3000;
-//                 ++stage_retry_times;
-//             } else {
-//                 modem_stage = STAGE_WAIT_IP;
-//                 goto _stage_succeed;
-//             }
-//             break;
-//         case STAGE_WAIT_IP: {
-//             //waiting 60s at most
-//             EventBits_t con_bits = xEventGroupWaitBits(s_modem_evt_hdl, (PPP_NET_CONNECT_BIT | MODEM_DESTROY_BIT), pdFALSE, pdFALSE, pdMS_TO_TICKS(60000));
-//             if (con_bits & MODEM_DESTROY_BIT) {
-//                 break;
-//             }
-//             if (con_bits & PPP_NET_CONNECT_BIT) {
-//                 xEventGroupClearBits(s_modem_evt_hdl, PPP_NET_RECONNECTING_BIT);
-//                 esp_event_post(MODEM_BOARD_EVENT, MODEM_EVENT_NET_CONN, NULL, 0, 0);
-//                 modem_stage = STAGE_RUNNING;
-//                 goto _stage_succeed;
-//             } else {
-//                 stage_retry_times = RETRY_TIMEOUT;
-//                 ESP_LOGW(TAG, "Modem Got IP timeout, retry from start!");
-//             }
-//         }
-//         break;
-//         case STAGE_RUNNING:
-//             // Ping to check network
-//             break;
-//         default:
-//             assert(0); //no stage get in here
-// _stage_succeed:
-//             ESP_LOGI(TAG, "Modem state %s, Success!", stare_str);
-//             stage_retry_times = 0;
-//             //add delay between each stage
-//             vTaskDelay(pdMS_TO_TICKS(100));
-//             break;
-//         }
-
-//         // if (count_err>=3){
-//         //     break;
-//         // }
-
-//     }
-
-  
-//     wdt_hal_write_protect_disable(&rwdt_ctx);
-//     wdt_hal_feed(&rwdt_ctx);
-//     // 任务正常退出时也设置标志
-//     xEventGroupSetBits(s_modem_evt_hdl, MODEM_TASK_EXIT_BIT);  //
-
-//     xEventGroupClearBits(s_modem_evt_hdl, ( PPP_NET_MODE_ON_BIT | PPP_NET_MODE_OFF_BIT | MODEM_DESTROY_BIT | DTE_USB_RECONNECT_BIT | PPP_NET_RECONNECTING_BIT));
-//     ESP_LOGI(TAG, "Modem Daemon Task Deleted!");
-//     vTaskDelete(NULL);
-// }
-
-
 
 static void _modem_daemon_task(void *param)
 {
@@ -944,8 +644,18 @@ _stage_succeed:
             break;
         }
     }
+
+    if (config->handler) {
+        esp_event_handler_unregister(MODEM_BOARD_EVENT, ESP_EVENT_ANY_ID, config->handler);
+    }
+    ESP_ERROR_CHECK(esp_event_handler_unregister(IP_EVENT, ESP_EVENT_ANY_ID, on_modem_event));
+    // destroy dte & dce
+    ESP_ERROR_CHECK(esp_modem_default_destroy(dte));
+    modem_board_t *board = __containerof(s_dce, modem_board_t, parent);
+    free(board);
     xEventGroupClearBits(s_modem_evt_hdl, (PPP_NET_MODE_ON_BIT | PPP_NET_MODE_OFF_BIT | MODEM_DESTROY_BIT | DTE_USB_RECONNECT_BIT | PPP_NET_RECONNECTING_BIT));
     ESP_LOGI(TAG, "Modem Daemon Task Deleted!");
+    xEventGroupSetBits(s_modem_evt_hdl, MODEM_DESTROY_DONE_BIT);
     vTaskDelete(NULL);
 }
 
@@ -971,28 +681,17 @@ esp_err_t modem_board_init(modem_config_t *config)
     if (((config->flags & MODEM_FLAGS_INIT_NOT_ENTER_PPP) == 0) && ((config->flags & MODEM_FLAGS_INIT_NOT_BLOCK) == 0)) {
         xEventGroupWaitBits(s_modem_evt_hdl, PPP_NET_CONNECT_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
     }
+    return ESP_OK;
+}
 
-    // 新增 自行修改 当sim卡没有插入时，也跳过连接
-    // if (((config->flags & MODEM_FLAGS_INIT_NOT_ENTER_PPP) == 0) && ((config->flags & MODEM_FLAGS_INIT_NOT_BLOCK) == 0)) {
-    //     // 等待两个事件：PPP连接成功 或 任务异常退出
-    //     EventBits_t bits = xEventGroupWaitBits(
-    //         s_modem_evt_hdl,
-    //         PPP_NET_CONNECT_BIT | MODEM_TASK_EXIT_BIT,  // 同时等待两个标志
-    //         pdFALSE,  // 不自动清除标志
-    //         pdFALSE,  // 不需要同时满足两个标志
-    //         portMAX_DELAY
-    //     );
-    //     // 检查事件触发结果
-    //     if (bits & MODEM_TASK_EXIT_BIT) {
-    //         ESP_LOGE(TAG, "Modem daemon task exited abnormally!");
-    //         return ESP_FAIL;  // 返回失败，避免阻塞
-    //     } else if (bits & PPP_NET_CONNECT_BIT) {
-    //         ESP_LOGI(TAG, "PPP connected successfully!");
-    //     } else {
-    //         ESP_LOGE(TAG, "Unknown event bits: 0x%x", (unsigned int)bits);
-    //         return ESP_FAIL;
-    //     }
-    // }
+esp_err_t modem_board_deinit(void)
+{
+    MODEM_CHECK(s_modem_evt_hdl, "Modem not init", ESP_ERR_INVALID_STATE);
+    xEventGroupSetBits(s_modem_evt_hdl, MODEM_DESTROY_BIT);
+    xEventGroupWaitBits(s_modem_evt_hdl, MODEM_DESTROY_DONE_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+    vEventGroupDelete(s_modem_evt_hdl);
+    s_modem_evt_hdl = NULL;
+    ESP_LOGI(TAG, "iot_usbh_modem Deinit Success!");
     return ESP_OK;
 }
 

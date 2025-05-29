@@ -11,11 +11,11 @@ description: esp-iot-solution USB Host Modem driver
 issues: https://github.com/espressif/esp-iot-solution/issues
 repository: git://github.com/espressif/esp-iot-solution.git
 repository_info:
-  commit_sha: 1e5c05bfc9eb43631d84fd22355219ba0c8c0142
+  commit_sha: 654e690103ded39f1a5bd8ba33069ecc79dc7211
   path: components/usb/iot_usbh_modem
 targets:
 - esp32s2
 - esp32s3
 - esp32p4
 url: https://github.com/espressif/esp-iot-solution
-version: 1.1.2
+version: 1.1.5

@@ -24,6 +24,7 @@ typedef enum {
     SYS_NETWORKING_4G,                  /**< 4G */
     SYS_NETWORKING_ETHERNET,            /**< ethernet */
     SYS_NETWORKING_ALL,                 /**< 4G + ethernet */
+    SYS_NETWORKING_UNB,                 /**< unb lora mode */
 } sys_networking_mode_t;
 
 typedef enum {

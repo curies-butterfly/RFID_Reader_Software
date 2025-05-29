@@ -35,7 +35,7 @@
 #include <cJSON.h>  // 包含 cJSON 库以生成 JSON 格式的消息
 
 #include "hal/wdt_hal.h"//watchdog
-
+#include "tp1107.h"
 
 static const char *TAG = "rfid_network";
 static const char *TAG_4G = "network_4G_module";
@@ -680,9 +680,10 @@ void network_init(void)
         module_4G_init();
     } else if(sys_info_config.sys_networking_mode == SYS_NETWORKING_ETHERNET) {
         ethernet_w5500_init();
-    } else if(sys_info_config.sys_networking_mode == SYS_NETWORKING_ALL) {
-        module_4G_init();
-        ethernet_w5500_init();
+    } else if(sys_info_config.sys_networking_mode == SYS_NETWORKING_UNB) {
+        // module_4G_init();
+        // ethernet_w5500_init();
+        unb_tp1107_init();//tp1107初始化
     } else {
         ESP_LOGI(TAG, "=========fatal err=========");
         return;

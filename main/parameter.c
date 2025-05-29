@@ -185,8 +185,8 @@ esp_err_t get_nvs_sys_info_config(void)
             sys_info_config.sys_networking_mode = SYS_NETWORKING_4G;
         } else if ( !strcmp(str, "ethernet") ) {
             sys_info_config.sys_networking_mode = SYS_NETWORKING_ETHERNET;
-        } else if ( !strcmp(str, "4G+ethernrt") ) {
-            sys_info_config.sys_networking_mode = SYS_NETWORKING_ALL;
+        } else if ( !strcmp(str, "lora") ) {
+            sys_info_config.sys_networking_mode = SYS_NETWORKING_UNB;
         }else {
             ESP_LOGE(TAG, "system networking mode %s is not define", str);
         }

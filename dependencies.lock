@@ -41,7 +41,7 @@ dependencies:
     - esp32s3
     version: 0.2.1
   espressif/iot_usbh_cdc:
-    component_hash: 257a968b0a8b5e8691e9b434cc8c44a6da200b9142711227fcc97db0be86eb63
+    component_hash: 75f2cb3e0534d4372113ae799b36fb5e46d27f3dc423169bf36d253a4e4642a9
     dependencies:
     - name: espressif/cmake_utilities
       registry_url: https://components.espressif.com
@@ -57,9 +57,9 @@ dependencies:
     - esp32s2
     - esp32s3
     - esp32p4
-    version: 1.0.2
+    version: 1.1.0
   espressif/iot_usbh_modem:
-    component_hash: e200caa05757061a01311bc241c48ea313d19cc96ac698f4df0f4bd7d2250ea6
+    component_hash: 40693a25db081126a415be5a2cdd7e3fbaf5cae9567b44c8e49366623c25eb49
     dependencies:
     - name: espressif/cmake_utilities
       registry_url: https://components.espressif.com
@@ -85,7 +85,7 @@ dependencies:
     - esp32s2
     - esp32s3
     - esp32p4
-    version: 1.1.2
+    version: 1.1.5
   espressif/jsmn:
     component_hash: d80350c41bbaa827c98a25b6072df00884e72f54885996fab4a4f0aebce6b6c3
     dependencies:

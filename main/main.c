@@ -267,8 +267,14 @@ void mqtt_publish_epc_data2()
 
     if (epcCnt != 0) //有数据才上报
     {
-        mqtt_client_publish(send_topic, json_str2, size2, 0, 1);
-        send_json_over_nb(json_str2);
+        
+        if(sys_info_config.sys_networking_mode==SYS_NETWORKING_UNB){
+            printf("[lora] 111");
+           send_json_over_nb(json_str2);    
+        }else{
+            mqtt_client_publish(send_topic, json_str2, size2, 0, 1);
+        }
+     
     }
    
     free(json_str2);
@@ -430,6 +436,7 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
     
+    wait_for_config_or_timeout();//串口0配置
 
     // //nvs写入操作
     // nvs_handle_t my_handle;//nvs句柄
@@ -522,9 +529,9 @@ void app_main(void)
     // sys_info_config.tcp_port=1883;
 
     ESP_LOGI("Type_EPC","type_epc = %d\n", type_epc);
-
+    wdt_hal_feed(&rwdt_ctx); //先喂一次狗
     network_init();
-    wdt_hal_feed(&rwdt_ctx); //4G初始化有点长，先喂一次狗
+    wdt_hal_feed(&rwdt_ctx); //先喂一次狗
     mqtt_init();
     rfid_http_init(s_modem_wifi_config);
 
@@ -534,8 +541,6 @@ void app_main(void)
     // moduleSetGpioInit();
     // // iic_init();
     // modBusRtu_Init();
-
-    unb_tp1107_init();//tp1107初始化
 
     // xEventGroup = xEventGroupCreate();
     // if (xEventGroup == NULL) {
@@ -577,16 +582,6 @@ void app_main(void)
     // rfid_read_config.read_interval_time =1000;//读取频率间隔
     // rfidready_flag=RFID_ReadEPC(rfid_read_config);
     
-    // ant_sel[0]="1";
-    // ant_sel[1]="2";
-    // ant_sel[2]="3";
-    // ant_sel[3]="4";
-   
-    // interval_time[0]="200";
-    // interval_time[1]="250";
-    // interval_time[2]="300";
-    // interval_time[3]="350";
-    // interval_time[4]="400";
 
     // OLEDDisplay_setTextAlignment(oled,TEXT_ALIGN_CENTER);
     // OLEDDisplay_setFont(oled,ArialMT_Plain_24);
@@ -604,26 +599,9 @@ void app_main(void)
     // OLEDDisplay_flipScreenVertically(oled);//反转镜像
 
     fan_gpio_init();
-    // xSemaphoreGive(uart1_rx_xBinarySemaphore);//给予一次信息量
-    // vTaskDelay(1000 / portTICK_PERIOD_MS); // 延迟 1 秒
 
     ctrl_rfid_mode(2);
-    // const char *json_data = "{\"status\":\"200\",\"epc_cnt\":\"2\",\"read_rate\":\"20\",\"data\":[{\"epc\":\"2613\",\"tem\":26.58,\"ant\":4,\"rssi\":88},{\"epc\":\"061e\",\"tem\":21.98,\"ant\":4,\"rssi\":53}]}";
-    // char hex_data[1024] = {0};
-    // json_to_hex_str(json_data, hex_data);
-    // size_t json_len = strlen(json_data);  // 注意是原始长度（字节）
-
-    // ESP_LOGI(TAG, "Original JSON (%d bytes): %s", json_len, json_data);
-    // ESP_LOGI(TAG, "Hex encoded JSON: %s", hex_data);
-
-    // // 构造 AT 命令
-    // char at_cmd[512] = {0};
-    // snprintf(at_cmd, sizeof(at_cmd), "AT+UNBSEND=%d,%s,0\r\n", json_len, hex_data);
-    // snprintf(at_cmd, sizeof(at_cmd), "AT+UNBSEND=5,0123456789,0\r\n");
-    // ESP_LOGI(TAG, "Sending AT command:\n%s", at_cmd);
-
-    //发送命令
-    // uart_write_bytes(UART_PORT, at_cmd, strlen(at_cmd));
+  
 
     while(1)
     {
@@ -653,21 +631,3 @@ void app_main(void)
     }
 }
 
-    // unb_tp1107_init();
-    // const char *json_data = "{\"status\":\"200\",\"epc_cnt\":\"2\",\"read_rate\":\"20\",\"data\":[{\"epc\":\"2613\",\"tem\":26.58,\"ant\":4,\"rssi\":88},{\"epc\":\"061e\",\"tem\":21.98,\"ant\":4,\"rssi\":53}]}";
-
-    // char hex_data[1024] = {0};
-    // json_to_hex_str(json_data, hex_data);
-    // size_t json_len = strlen(json_data);  // 注意是原始长度（字节）
-
-    // ESP_LOGI(TAG, "Original JSON (%d bytes): %s", json_len, json_data);
-    // ESP_LOGI(TAG, "Hex encoded JSON: %s", hex_data);
-
-    // // 构造 AT 命令
-    // char at_cmd[512] = {0};
-    // snprintf(at_cmd, sizeof(at_cmd), "AT+UNBSEND=%d,%s,0\r\n", json_len, hex_data);
-    
-    // ESP_LOGI(TAG, "Sending AT command:\n%s", at_cmd);
-
-    // 发送命令
-    // uart_write_bytes(UART_PORT, at_cmd, strlen(at_cmd));

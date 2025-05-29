@@ -6,11 +6,11 @@ documentation: https://docs.espressif.com/projects/esp-iot-solution/en/latest/us
 issues: https://github.com/espressif/esp-iot-solution/issues
 repository: git://github.com/espressif/esp-iot-solution.git
 repository_info:
-  commit_sha: 1e5c05bfc9eb43631d84fd22355219ba0c8c0142
+  commit_sha: 40e383f968c13e87e709c9d52a39892eca376e25
   path: components/usb/iot_usbh_cdc
 targets:
 - esp32s2
 - esp32s3
 - esp32p4
 url: https://github.com/espressif/esp-iot-solution/tree/master/components/usb/iot_usbh_cdc
-version: 1.0.2
+version: 1.1.0

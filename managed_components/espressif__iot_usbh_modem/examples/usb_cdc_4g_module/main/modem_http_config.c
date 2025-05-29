@@ -371,10 +371,8 @@ static esp_err_t wlan_general_get_handler(httpd_req_t *req)
     esp_err_t ret = httpd_resp_set_status(req, HTTPD_200);
     ESP_ERROR_CHECK(ret);
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
      * @brief Set the HTTP content type
      */
@@ -430,10 +428,8 @@ static esp_err_t wlan_general_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "====================================");
     }
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     jparse_ctx_t jctx;
     int ps_ret = json_parse_start(&jctx, buf, strlen(buf));
 
@@ -517,10 +513,8 @@ static esp_err_t wlan_advance_get_handler(httpd_req_t *req)
     size = asprintf(&json_str, "{\"status\":\"200\", \"bandwidth\":\"%d\", \"channel\":\"%d\"}", user_bandwidth,
                     s_modem_wifi_config->channel);
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
      * @brief Set the HTTP status code
      */
@@ -580,10 +574,8 @@ static esp_err_t wlan_advance_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "====================================");
     }
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     jparse_ctx_t jctx;
     int ps_ret = json_parse_start(&jctx, buf, strlen(buf));
 
@@ -636,10 +628,8 @@ static esp_err_t login_get_handler(httpd_req_t *req)
 
     char *json_str = NULL;
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
      * @brief Set the HTTP status code
      */
@@ -691,10 +681,8 @@ static esp_err_t system_station_get_handler(httpd_req_t *req)
     size = asprintf(&json_str_old, "%s],\"now_time\":\"%lld\"}", json_str, esp_timer_get_time());
 
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     /**
      * @brief Set the HTTP status code
      */
@@ -756,10 +744,8 @@ static esp_err_t system_station_delete_device_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "====================================");
     }
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     jparse_ctx_t jctx;
     int ps_ret = json_parse_start(&jctx, buf, strlen(buf));
 
@@ -841,10 +827,8 @@ static esp_err_t system_station_change_name_post_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "====================================");
     }
     httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
-    // httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "Content-Type");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Headers", "*");
     jparse_ctx_t jctx;
     int ps_ret = json_parse_start(&jctx, buf, strlen(buf));
 
