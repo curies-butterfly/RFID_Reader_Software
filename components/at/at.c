@@ -888,8 +888,6 @@ __exit:
 //     stm32_uart_handle[uart_index].rx_ind = set_rx_ind;
 // }
 
-
-
 /**
  * AT client initialize.
  *

@@ -137,6 +137,10 @@ static void set_nvs_LabelType(const char *label_mode_str){
 }
 
 static void set_nvs_netSel(bool num1,bool num2,bool num3){
+    if ((num1 + num2 + num3) != 1) {
+        ESP_LOGE(TAG, "Invalid network selection.");
+        return;
+    }
     if(num1)
         ESP_ERROR_CHECK(from_nvs_set_value("net_sel", "4G"));
     else if(num2)
@@ -146,6 +150,19 @@ static void set_nvs_netSel(bool num1,bool num2,bool num3){
     else {
         return;
     }
+}
+
+static void set_nvs_wifista(const char *ssid, const char *pswd)
+{
+    if (ssid == NULL || pswd == NULL || strlen(ssid) == 0 || strlen(pswd) == 0) {
+        ESP_LOGE(TAG, "Invalid SSID or password.");
+        return;
+    }
+
+    ESP_ERROR_CHECK(from_nvs_set_value("wifi_ssid", ssid));
+    ESP_ERROR_CHECK(from_nvs_set_value("wifi_pswd", pswd));
+
+    ESP_LOGI(TAG, "WiFi STA configuration saved: SSID = %s,PSWD = %s", ssid, pswd);
 }
 
 // 串口0配置信息
@@ -180,9 +197,9 @@ void wait_for_config_or_timeout(void) {
                 // 写入 NVS
                 // ESP_ERROR_CHECK(from_nvs_set_value("ssid", user_ssid));
                 // ESP_ERROR_CHECK(from_nvs_set_value("password", user_password));
-                set_nvs_LabelType(g_config.label_mode);
-
-                set_nvs_netSel(g_config.enable_4g, g_config.enable_eth, g_config.enable_lora);
+                set_nvs_LabelType(g_config.label_mode);//设置读取的标签类型
+                set_nvs_netSel(g_config.enable_4g, g_config.enable_eth, g_config.enable_lora);//设置三种上网模式
+                set_nvs_wifista(g_config.wifi_ssid,g_config.wifi_psd);//设置wifi sta ssid psd
                 // save_config_to_nvs();
 
                 return; // 正常接收后直接返回

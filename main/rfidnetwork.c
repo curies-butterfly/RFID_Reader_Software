@@ -36,6 +36,8 @@
 
 #include "hal/wdt_hal.h"//watchdog
 #include "tp1107.h"
+#include "nvs.h"
+
 
 static const char *TAG = "rfid_network";
 static const char *TAG_4G = "network_4G_module";
@@ -80,8 +82,11 @@ static int s_retry_num = 0;
 /* FreeRTOS event group to signal when we are connected/disconnected */
 static EventGroupHandle_t s_wifi_event_group;
 
-
-
+typedef struct {
+    char ssid[32];      // 最多32字节
+    char password[64];  // 最多64字节
+} user_wifi_sta_info_t;
+user_wifi_sta_info_t wifi_sta_info;
 // 定义全局变量以确保生命周期
 static char *lwt_msg = NULL;
 
@@ -615,6 +620,42 @@ static void module_4G_init(void)
     modem_board_init(&modem_config);
 }
 
+static void wifi_nvs_par(void)
+{
+    char ssid[32] = {0};
+    char password[64] = {0};
+    size_t len;
+    esp_err_t err;
+    nvs_handle_t nvs_handle;
+
+    // // 打开 NVS
+    // err = nvs_open("storage", NVS_READONLY, &nvs_handle);
+    // if (err != ESP_OK) {
+    //     ESP_LOGE(TAG_STA, "Failed to open NVS: %s", esp_err_to_name(err));
+    //     return;
+    // }
+ 
+    // 读取 SSID
+    len = sizeof(ssid);
+    err = from_nvs_get_value("wifi_ssid",ssid,&len);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_STA, "Failed to read SSID from NVS: %s", esp_err_to_name(err));
+        return;
+    }
+
+    // 读取密码
+    len = sizeof(password);
+    err = from_nvs_get_value("wifi_pswd", password, &len);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG_STA, "Failed to read PSWD from NVS: %s", esp_err_to_name(err));
+        return;
+    }
+    strncpy(wifi_sta_info.ssid, ssid, sizeof(wifi_sta_info.ssid));
+    strncpy(wifi_sta_info.password, password, sizeof(wifi_sta_info.password));
+}
+
+
+
 static void wifi_ap_init(void)
 {
     esp_netif_t *ap_netif = modem_wifi_ap_init();
@@ -650,16 +691,47 @@ static void wifi_ap_sta_init(void) {
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();//创建一个默认的WIFI客户端STA的网络端口，并返回指向该接口的指针
     assert(sta_netif != NULL);  // 确保创建成功
 
+    //从NVS中读取ssid和pswd
+    wifi_nvs_par();
+    
     // 配置 STA 模式的 Wi-Fi 参数
+    // wifi_config_t sta_config = {
+    //     .sta = {
+    //         .ssid = EXAMPLE_ESP_WIFI_STA_SSID,//ssid名称
+    //         .password = EXAMPLE_ESP_WIFI_STA_PASSWD,//密钥
+    //         .scan_method = WIFI_ALL_CHANNEL_SCAN,//扫描方式
+    //         .failure_retry_cnt = EXAMPLE_ESP_MAXIMUM_RETRY,//失败重试次数
+    //         .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,//认证模式
+    //     },
+    // };
+    // ESP_LOGE("123","%s,len=%d",wifi_sta_info.ssid,strlen(wifi_sta_info.ssid));
+    // if (strlen(wifi_sta_info.ssid) > 0) {//如果nvs中有值,就不使用默认值（idf.py menuconfig中设置的）
+    //     strncpy((char *)sta_config.sta.ssid, wifi_sta_info.ssid, sizeof(sta_config.sta.ssid) - 1);
+    //     strncpy((char *)sta_config.sta.password, wifi_sta_info.password, sizeof(sta_config.sta.password) - 1);
+    // } 
+
     wifi_config_t sta_config = {
         .sta = {
-            .ssid = EXAMPLE_ESP_WIFI_STA_SSID,//ssid名称
-            .password = EXAMPLE_ESP_WIFI_STA_PASSWD,//密钥
-            .scan_method = WIFI_ALL_CHANNEL_SCAN,//扫描方式
-            .failure_retry_cnt = EXAMPLE_ESP_MAXIMUM_RETRY,//失败重试次数
-            .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,//认证模式
-        },
+            .scan_method = WIFI_ALL_CHANNEL_SCAN,
+            .failure_retry_cnt = EXAMPLE_ESP_MAXIMUM_RETRY,
+            .threshold.authmode = ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD,
+        }
     };
+    
+    if (strlen(wifi_sta_info.ssid) > 0) {//nvs中有ssid和pswd
+        strncpy((char *)sta_config.sta.ssid, wifi_sta_info.ssid, sizeof(sta_config.sta.ssid) - 1);
+        sta_config.sta.ssid[sizeof(sta_config.sta.ssid) - 1] = '\0';
+    
+        strncpy((char *)sta_config.sta.password, wifi_sta_info.password, sizeof(sta_config.sta.password) - 1);
+        sta_config.sta.password[sizeof(sta_config.sta.password) - 1] = '\0';
+    } else {//没有则默认ssid pswd (idf.py menuconfig -> )
+        strncpy((char *)sta_config.sta.ssid, EXAMPLE_ESP_WIFI_STA_SSID, sizeof(sta_config.sta.ssid) - 1);
+        sta_config.sta.ssid[sizeof(sta_config.sta.ssid) - 1] = '\0';
+    
+        strncpy((char *)sta_config.sta.password, EXAMPLE_ESP_WIFI_STA_PASSWD, sizeof(sta_config.sta.password) - 1);
+        sta_config.sta.password[sizeof(sta_config.sta.password) - 1] = '\0';
+    }
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &sta_config));//设置STA模式下的Wi-Fi参数
 
     // 启动 Wi-Fi
@@ -668,8 +740,8 @@ static void wifi_ap_sta_init(void) {
     // 连接 STA 模式
     ESP_ERROR_CHECK(esp_wifi_connect());
 
-    ESP_LOGI(TAG_STA, "WiFi STA mode initialized, connecting to SSID: %s", EXAMPLE_ESP_WIFI_STA_SSID);//打印信息，连接Wi-Fi的ssid名称
-}
+    ESP_LOGI(TAG_STA, "WiFi STA mode initialized, connecting to SSID: %s",  sta_config.sta.ssid);//打印信息，连接Wi-Fi的ssid名称
+} 
 
 void network_init(void)
 {
@@ -711,3 +783,19 @@ int mqtt_client_publish(const char *topic, const char *data, int len, int qos, i
     return esp_mqtt_client_publish(mqtt_client, topic, data, len, qos, retain);
 }
 
+
+
+char *get_effective_ip_str(void) {
+    static char ip_str[16] = {0};  // 静态分配，避免野指针（最大长度 xxx.xxx.xxx.xxx）
+    esp_netif_ip_info_t ip_info;
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+
+    if (esp_netif_get_ip_info(netif, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
+        snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&ip_info.ip));
+        ESP_LOGI("IP", "已获取 IP: %s", ip_str);
+        return ip_str;
+    } else {
+        ESP_LOGW("IP", "未获取有效 IP");
+        return NULL;
+    }
+}

@@ -10,18 +10,15 @@
 #include "string.h"
 #include "driver/gpio.h"
 #include "driver_uart.h"
-
 #include "rfidmodule.h"
 #include "rfidcommon.h"
 #include "modbus_rtu.h"
 #include "sht30.h"
 #include "led.h"
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 #include "esp_system.h"
@@ -31,19 +28,15 @@
 #include "nvs.h"
 #include "esp_netif.h"
 #include "esp_eth.h"
-
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
 #include "usbh_modem_wifi.h"
-
 #include "driver/spi_master.h"
-
 #include "rfidnetwork.h"
 #include "httpconfig.h"
 #include "parameter.h"
 #include "sdkconfig.h"
-
 #include "dev_info.h"
 #include "OLEDDisplay.h"
 #include "OLEDDisplayFonts.h"
@@ -269,9 +262,12 @@ void mqtt_publish_epc_data2()
     {
         
         if(sys_info_config.sys_networking_mode==SYS_NETWORKING_UNB){
-            printf("[lora] 111");
            send_json_over_nb(json_str2);    
         }else{
+            mqtt_client_publish(send_topic, json_str2, size2, 0, 1);
+        }
+        const char *ip = get_effective_ip_str();
+        if (ip != NULL) {
             mqtt_client_publish(send_topic, json_str2, size2, 0, 1);
         }
      
@@ -477,36 +473,6 @@ void app_main(void)
     }
 
     */
-    //设置读写标签类型 悦和 星沿
-    char label_mode_str[16] = {0};       // 当前 NVS 中的值
-    size_t str_size = sizeof(label_mode_str);
-    esp_err_t err = from_nvs_get_value("label_mode", label_mode_str, &str_size);
-    if (err == ESP_OK) {
-        ESP_LOGI(TAG, "label_mode from NVS: %s", label_mode_str);
-    
-        // 根据字符串设置 type_epc
-        if (strcmp(label_mode_str, "YH") == 0) {
-            type_epc = 1;
-        } else if (strcmp(label_mode_str, "XY") == 0) {
-            type_epc = 2;
-        } else {
-            type_epc = 0;
-        }
-    
-        ESP_LOGI(TAG, "type_epc set to: %d", type_epc);
-    
-    } else {
-        ESP_LOGW(TAG, "label_mode not found, setting default to 'YH'");
-        // 如果没读到，说明不存在，写入默认值
-        err = from_nvs_set_value("label_mode", "YH");
-        if (err == ESP_OK) {
-            ESP_LOGI(TAG, "Successfully set default label_mode to: YH");
-            type_epc = 1; // 默认值设为 YH 对应的 type_epc
-        } else {
-            ESP_LOGE(TAG, "Failed to set default label_mode: %s", esp_err_to_name(err));
-            type_epc = 0;
-        }
-    }
 
     /* Initialize default TCP/IP stack */
     ESP_ERROR_CHECK(esp_netif_init());//初始化网络接口
@@ -519,16 +485,9 @@ void app_main(void)
     get_nvs_auth_info_config();
     get_nvs_sys_info_config();
     
-    //from_nvs_set_value 目前没有加nvs写操作，只有读取nvs中的数据
-    // char strcop2[]="mqtt://101.37.253.97:4635";
-    // strcpy(sys_info_config.mqtt_address, strcop2);
     ESP_LOGI(TAG,"MQTT_ADDRESS: %s",sys_info_config.mqtt_address);
-
-    // sys_info_config.mqtt_address="mqtt://123.60.157.221";
-    // sys_info_config.tcp_address="123.60.157.221";
-    // sys_info_config.tcp_port=1883;
-
     ESP_LOGI("Type_EPC","type_epc = %d\n", type_epc);
+
     wdt_hal_feed(&rwdt_ctx); //先喂一次狗
     network_init();
     wdt_hal_feed(&rwdt_ctx); //先喂一次狗
@@ -614,7 +573,6 @@ void app_main(void)
         
         // uart_write_bytes(UART_NUM_2, at_cmd, strlen(at_cmd));
  
-
         // RFID_ShowEpc(LTU3_Lable);
         // SHT30_read_result(0x44, &sht30_data);
         // char *json_str = NULL;
