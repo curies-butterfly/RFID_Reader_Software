@@ -26,4 +26,6 @@ int uart2_SendStr(char* data);
 void rx_task(void *arg);
 
 
+// extern SemaphoreHandle_t uart1_rx_xBinarySemaphore;//信号量创句柄
+
 #endif

@@ -1,0 +1,21 @@
+dependencies:
+  cmake_utilities: 0.*
+  espressif/esp_wifi_remote:
+    rules:
+    - if: target in [esp32p4]
+    version: 0.*
+  idf: '>=4.4.1'
+  iot_usbh_cdc:
+    version: 1.*
+description: esp-iot-solution USB Host Modem driver
+issues: https://github.com/espressif/esp-iot-solution/issues
+repository: git://github.com/espressif/esp-iot-solution.git
+repository_info:
+  commit_sha: 654e690103ded39f1a5bd8ba33069ecc79dc7211
+  path: components/usb/iot_usbh_modem
+targets:
+- esp32s2
+- esp32s3
+- esp32p4
+url: https://github.com/espressif/esp-iot-solution
+version: 1.1.5

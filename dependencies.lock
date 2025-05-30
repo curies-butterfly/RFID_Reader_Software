@@ -1,33 +1,195 @@
 dependencies:
   espressif/cmake_utilities:
     component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.1'
     source:
-      storage_url: file:///D:/Espressif/registry
+      registry_url: https://components.espressif.com
       type: service
     version: 0.5.3
-  espressif/led_strip:
-    component_hash: 67d2744208e9c12d8b1992d21c979396c1726e57cb7e35e7c171c515be20f8ea
+  espressif/i2c_bus:
+    component_hash: e3dddc78baa172f4768f3973fbecbd6c6c1f2cb23cc6a36cf3132758be092482
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: idf
+      require: private
+      version: '>=4.0'
     source:
-      storage_url: file:///D:/Espressif/registry
+      registry_url: https://components.espressif.com
       type: service
-    version: 2.5.3
+    version: 1.4.0
+  espressif/iot_usbh:
+    component_hash: 6248b9fb5c33ee7a0572c75947d79ec9f1ef44c0a2dd123665b22424d49e956e
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.4.1'
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32s2
+    - esp32s3
+    version: 0.2.1
+  espressif/iot_usbh_cdc:
+    component_hash: 75f2cb3e0534d4372113ae799b36fb5e46d27f3dc423169bf36d253a4e4642a9
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: '*'
+    - name: idf
+      require: private
+      version: '>=4.4.1'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32s2
+    - esp32s3
+    - esp32p4
+    version: 1.1.0
+  espressif/iot_usbh_modem:
+    component_hash: 40693a25db081126a415be5a2cdd7e3fbaf5cae9567b44c8e49366623c25eb49
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: espressif/esp_wifi_remote
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: target in [esp32p4]
+      version: 0.*
+    - name: idf
+      require: private
+      version: '>=4.4.1'
+    - name: espressif/iot_usbh_cdc
+      registry_url: https://components.espressif.com
+      require: private
+      version: 1.*
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32s2
+    - esp32s3
+    - esp32p4
+    version: 1.1.5
+  espressif/jsmn:
+    component_hash: d80350c41bbaa827c98a25b6072df00884e72f54885996fab4a4f0aebce6b6c3
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.3'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.1.0
+  espressif/json_parser:
+    component_hash: d74b81729ad06ec11ff5eb5b1b0d7df1d00e6027fc11471f4b139c70dcf1b1e4
+    dependencies:
+    - name: espressif/jsmn
+      registry_url: https://components.espressif.com
+      require: private
+      rules:
+      - if: idf_version >=5.0
+      version: ~1.1
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.3
+  espressif/led_indicator:
+    component_hash: 5b2531835a989825c0dc94465e3481086473e086dca109b99bea5605d8e70396
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: '*'
+    - name: idf
+      require: private
+      version: '>=4.0'
+    - name: espressif/led_strip
+      registry_url: https://components.espressif.com
+      require: public
+      version: 2.5.5
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.1.1
+  espressif/led_strip:
+    component_hash: 28c6509a727ef74925b372ed404772aeedf11cce10b78c3f69b3c66799095e2d
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.4'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 2.5.5
+  espressif/sensor_hub:
+    component_hash: cdd086c23673c34c6182dfc5b2e9612368a9e3436080934aa11d09c2e8e9e661
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: espressif/i2c_bus
+      registry_url: https://components.espressif.com
+      require: public
+      version: 1.*
+    - name: idf
+      require: private
+      version: '>=4.4'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 0.1.2
+  espressif/sht3x:
+    component_hash: c9bcb43e9d771dbd65e5855b12424d0a386b07d9aba98b2ed57890985013f4e5
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: espressif/i2c_bus
+      registry_url: https://components.espressif.com
+      require: public
+      version: '*'
+    - name: idf
+      require: private
+      version: '>=4.4'
+    - name: espressif/sensor_hub
+      registry_url: https://components.espressif.com
+      require: public
+      version: '*'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.2.0
   idf:
-    component_hash: null
     source:
       type: idf
-    version: 5.2.1
-  iot_usbh:
-    component_hash: null
-    source:
-      path: D:\ESP32_IDF\RFIDReader_S3\components\iot_usbh
-      type: local
-    version: 0.2.1
-  iot_usbh_cdc:
-    component_hash: null
-    source:
-      path: D:\ESP32_IDF\RFIDReader_S3\components\iot_usbh_cdc
-      type: local
-    version: 0.2.1
-manifest_hash: ce0b224fa59a17dfaddc255c29880d3e9f8247b2f4e6f32b67d0d07468bdd469
+    version: 5.2.5
+direct_dependencies:
+- espressif/iot_usbh
+- espressif/iot_usbh_cdc
+- espressif/iot_usbh_modem
+- espressif/jsmn
+- espressif/json_parser
+- espressif/led_indicator
+- espressif/sht3x
+- idf
+manifest_hash: 448bd1b1e76c3969c642946c5b7160ee3927d14c06cf01d20b1e42cc27419a9b
 target: esp32s3
-version: 1.0.0
+version: 2.0.0

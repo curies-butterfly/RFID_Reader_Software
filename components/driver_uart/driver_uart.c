@@ -6,13 +6,18 @@ static const int U2_RX_BUF_SIZE = 2048;
 
 QueueHandle_t   RFID_EpcQueue;  //用于同步串口数据处理任务后，给RFID数据处理任务
 
-#define TXD_PIN 41//(GPIO_NUM_16)
-#define RXD_PIN 42//(GPIO_NUM_17)
+#define TXD_PIN 41//(GPIO_NUM_41)
+#define RXD_PIN 42//(GPIO_NUM_42)
 
-#define U2_TXD_PIN 21//(GPIO_NUM_19)
-#define U2_RXD_PIN 47//(GPIO_NUM_5)
+#define U2_TXD_PIN 21//(GPIO_NUM_21)
+#define U2_RXD_PIN 47//(GPIO_NUM_47)
 
-void uart1_Init(void)
+
+#define MAX_DATA_LEN 10000
+uint8_t UARTRecvFrame_pData[MAX_DATA_LEN+ 2];
+
+
+void uart1_Init(void)//RFID
 {
     const uart_config_t uart_config = 
     {
@@ -27,11 +32,12 @@ void uart1_Init(void)
     uart_driver_install(UART_NUM_1, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
     uart_param_config(UART_NUM_1, &uart_config);
     uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    RFID_EpcQueue = xQueueCreate( 20, sizeof( BaseDataFrame_t ) );
+    RFID_EpcQueue = xQueueCreate(20, sizeof( BaseDataFrame_t ) );
+    
 }
 
 
-void uart2_Init(void)
+void uart2_Init(void)//485
 {
     const uart_config_t uart_config = 
     {
@@ -77,7 +83,7 @@ int uart2_SendStr(char* data)
     return txBytes;
 }
 
-
+int count1;
 //Bug 需要考虑数据越界问题，i定位到帧头0x5A的位置后，i后面不一定有数据
 void rx_task(void *arg)
 {
@@ -87,15 +93,19 @@ void rx_task(void *arg)
     uint8_t* data = (uint8_t*) malloc(RX_BUF_SIZE+1);
     uint16_t frameLen = 0;
     uint16_t CRC_val = 0;
+
+    // CircularQueue uartQueue;
+    // initQueue(&uartQueue);
+
     while (1) 
     {
         const int rxBytes = uart_read_bytes(UART_NUM_1, data, RX_BUF_SIZE, 200 / portTICK_PERIOD_MS);
-        //200 / portTICK_PERIOD_MS,这里表示接收数据等待时间，越小接收的响应速度就越好
+        // 200 / portTICK_PERIOD_MS,这里表示接收数据等待时间，越小接收的响应速度就越好
         int i = 0;
         if (rxBytes > 0) 
         {
             data[rxBytes] = 0;
-           // ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
+            // ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
             //ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);
             while(i < rxBytes)
             {
@@ -113,10 +123,15 @@ void rx_task(void *arg)
                 }
                 else
                 {  
+                    // for (int i = 0; i < rxBytes; i++) {
+                    //     printf("%02X ", data[i]);  // 两位十六进制
+                    // }
+                    // printf("#####################\n");
                     frameDealFlag = 1;   //接收到了一帧数据
                     //如果是一帧正确的数据，那么data[i+3]则是协议控制字的第3个Byte，data[i+3]&0x20是协议控制字的Bit 13
                     //如果Bit 13为RS485 标志位，当为1时才有串行设备地址
                     //这里并没有先判断数据的正确性，因为必须要先确定数据的长度后才能作CRC校验。
+                    // ESP_LOGI(RFID_TAG, "找到帧头");
                     if(data[i+3]&0x20)  
                     {   
                         UARTRecvFrame.DevAddr = data[i+5]; //有设备地址
@@ -127,6 +142,7 @@ void rx_task(void *arg)
                     {
                         UARTRecvFrame.DevAddr = 0;      //无设备地址
                         UARTRecvFrame.DataLen = ((uint16_t)data[i+5]<<8)|((uint16_t)data[i+6]);
+                        // printf("UARTRecvFrame.DataLen:%x\n",UARTRecvFrame.DataLen);
                         frameLen = 6 + UARTRecvFrame.DataLen; //帧长度 
                     }
                     CRC_val = CRC16_CCITT(&data[i+1],frameLen); //CRC校验
@@ -136,21 +152,51 @@ void rx_task(void *arg)
                       //  ESP_LOGI(RFID_TAG,"crc check success");
                       //  ESP_LOGI(RFID_TAG, "CRC_Value:%x",CRC_val);
                         UARTRecvFrame.CRCValu = CRC_val;
-                        UARTRecvFrame.ProCtrl[0] = data[i+1];
+                        UARTRecvFrame.ProCtrl[0] = data[i+1];//最高位
                         UARTRecvFrame.ProCtrl[1] = data[i+2];
                         UARTRecvFrame.ProCtrl[2] = data[i+3];
-                        UARTRecvFrame.ProCtrl[3] = data[i+4];
-                        
+                        UARTRecvFrame.ProCtrl[3] = data[i+4];//最低位
+                  
                         if(UARTRecvFrame.ProCtrl[2]&0x10 && UARTRecvFrame.ProCtrl[3]==0x00) //读EPC数据帧
                         {
                             //为保证数据不丢失，为数据开放新的空间存储,EPC数据处理任务处理完后将会把空间free
+                            // while(xSemaphoreTake(uart1_rx_xBinarySemaphore, portMAX_DELAY)!= pdTRUE);
+                        
                             UARTRecvFrame.pData = (uint8_t*)malloc(sizeof(uint8_t)*UARTRecvFrame.DataLen + 2);
+                            // UARTRecvFrame.pData = UARTRecvFrame_pData;
                             memcpy(UARTRecvFrame.pData,&data[i+frameLen-UARTRecvFrame.DataLen+1],UARTRecvFrame.DataLen);
-                            
-                            if(RFID_EpcQueue != 0) //将EPC数据帧，发送到EPC数据帧队列
+
+                            // for(int j = 0; j < UARTRecvFrame.DataLen; j++) {
+                            //     printf("%02X ", UARTRecvFrame.pData[j]);  // Print as hexadecimal
+                            //     // Alternatively for ASCII: printf("%c", UARTRecvFrame.pData[j]);
+                            // }
+
+                            // if(RFID_EpcQueue != 0) //将EPC数据帧，发送到EPC数据帧队列
+                            // {
+                            //     // count1++;
+                            //     // printf("EPC_Queue_Count:%d\n",count1);
+                            //     xQueueGenericSend( RFID_EpcQueue, (void*) &UARTRecvFrame, ( TickType_t ) 0, queueSEND_TO_BACK);   
+                                
+                            // }
+
+                            if (RFID_EpcQueue != NULL)
                             {
-                                xQueueGenericSend( RFID_EpcQueue, ( void * ) &UARTRecvFrame, ( TickType_t ) 0, queueSEND_TO_BACK );   
-                            }  
+                                BaseType_t sendStatus = xQueueGenericSend(RFID_EpcQueue, (void *)&UARTRecvFrame, (TickType_t)0, queueSEND_TO_BACK);
+                                if (sendStatus != pdPASS)
+                                {
+                                    //bug2025.4.30 修改：// 如果发送失败了，要释放掉之前 malloc 的内存
+                                    // ESP_LOGW(RFID_TAG, "Failed to send EPC frame to queue, freeing pData");
+                                    free(UARTRecvFrame.pData);
+                                    UARTRecvFrame.pData = NULL;
+                                }
+                            }
+                            else
+                            {
+                                 //bug2025.4.30 修改： // 队列根本没创建成功，也要释放内存
+                                // ESP_LOGW(RFID_TAG, "EPC Queue not created, freeing pData");
+                                free(UARTRecvFrame.pData);
+                                UARTRecvFrame.pData = NULL;
+                            }
                         }
 
                         else  //其它数据帧，通常是配置结果的返回,数据存储在data数据

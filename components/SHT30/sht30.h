@@ -3,7 +3,7 @@
 
 #include "esp_err.h"
 #include "driver/i2c.h"
-#include "hal\i2c_types.h"
+#include "hal/i2c_types.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"

@@ -7,6 +7,7 @@
 #include "nvs_flash.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "rfidmodule.h"
 
 
 static const char *TAG = "parameter_manage";
@@ -154,20 +155,7 @@ esp_err_t get_nvs_sys_info_config(void)
     char str[64] = "";
     size_t str_size = sizeof(str);
     esp_err_t err;
-    // err = from_nvs_get_value("h_ver", str, &str_size);
-    // if ( err == ESP_OK ) {
-    //     memset(sys_info_config.sys_hard_version, '\0', 
-    //     sizeof(sys_info_config.sys_hard_version));
-    //     strncpy(sys_info_config.sys_hard_version, str, str_size);
-    // }
-    // str_size = sizeof(str);
-    // err = from_nvs_get_value("s_ver", str, &str_size);
-    // if ( err == ESP_OK ) {
-    //     memset(sys_info_config.sys_soft_version, '\0', 
-    //     sizeof(sys_info_config.sys_soft_version));
-    //     strncpy(sys_info_config.sys_soft_version, str, str_size);
-    // }
-    // str_size = sizeof(str);
+
     err = from_nvs_get_value("w_mod", str, &str_size);
     if ( err == ESP_OK ) {
         if ( !strcmp(str, "rfid reader") ) {
@@ -185,8 +173,8 @@ esp_err_t get_nvs_sys_info_config(void)
             sys_info_config.sys_networking_mode = SYS_NETWORKING_4G;
         } else if ( !strcmp(str, "ethernet") ) {
             sys_info_config.sys_networking_mode = SYS_NETWORKING_ETHERNET;
-        } else if ( !strcmp(str, "4G+ethernrt") ) {
-            sys_info_config.sys_networking_mode = SYS_NETWORKING_ALL;
+        } else if ( !strcmp(str, "lora") ) {
+            sys_info_config.sys_networking_mode = SYS_NETWORKING_UNB;
         }else {
             ESP_LOGE(TAG, "system networking mode %s is not define", str);
         }
@@ -221,6 +209,42 @@ esp_err_t get_nvs_sys_info_config(void)
     if ( err == ESP_OK ) {
         sys_info_config.tcp_port = atoi(str);
     }
+
+
+    
+   //设置读写标签类型 悦和 星沿
+   char label_mode_str[16] = {0};       // 当前 NVS 中的值
+   str_size = sizeof(label_mode_str);
+   err = from_nvs_get_value("label_mode", label_mode_str, &str_size);
+   if (err == ESP_OK) {
+       ESP_LOGI(TAG, "label_mode from NVS: %s", label_mode_str);
+   
+       // 根据字符串设置 type_epc
+       if (strcmp(label_mode_str, "YH") == 0) {
+           type_epc = 1;
+       } else if (strcmp(label_mode_str, "XY") == 0) {
+           type_epc = 2;
+       } else {
+           type_epc = 0;
+       }
+   
+       ESP_LOGI(TAG, "type_epc set to: %d", type_epc);
+   
+   } else {
+       ESP_LOGW(TAG, "label_mode not found, setting default to 'YH'");
+       // 如果没读到，说明不存在，写入默认值
+       err = from_nvs_set_value("label_mode", "YH");
+       if (err == ESP_OK) {
+           ESP_LOGI(TAG, "Successfully set default label_mode to: YH");
+           type_epc = 1; // 默认值设为 YH 对应的 type_epc
+       } else {
+           ESP_LOGE(TAG, "Failed to set default label_mode: %s", esp_err_to_name(err));
+           type_epc = 0;
+       }
+   }
+
+
+
     return ESP_OK;
 }
 
