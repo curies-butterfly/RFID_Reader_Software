@@ -45,6 +45,8 @@
 #include "at.h"
 #include "tp1107.h"
 
+#include "data_deal.h"
+
 static const char *TAG = "rfid_reader";
 
 void RFID_MqttTask(void *arg);
@@ -227,62 +229,6 @@ void mqtt_publish_epc_data()
     free(json_str);
 }
 
-void mqtt_publish_epc_data2()
-{
-    EPC_Info_t **EPC_ptr2 = &LTU3_Lable;
-    char *epc_data2 = NULL;
-    if (epcCnt == 0) // 防止出现空指针
-    {
-        epc_data2 = (char *)malloc(sizeof(char) * 1 * 120);
-        memset(epc_data2, '\0', sizeof(char) * 1 * 120);
-    }
-    else
-    {
-        epc_data2 = (char *)malloc(sizeof(char) * epcCnt * 120);
-        memset(epc_data2, '\0', sizeof(char) * epcCnt * 120);
-    }
-    char one_epc_data2[120] = {'\0'};
-    uint16_t epc_read_rate2 = 20;
-    for (int i = 0; i < 120; i++)
-    {
-        if (EPC_ptr2[i] == NULL)
-            break;
-        memset(one_epc_data2, 0, sizeof(one_epc_data2));
-
-        EPC_ptr2[i]->last_temp = (EPC_ptr2[i]->tempe) / 100.0; // EPC_ptr
-
-        sprintf(one_epc_data2, "{\"epc\":\"%02x%02x\",\"tem\":%.2f,\"ant\":%d,\"rssi\":%d}",
-                EPC_ptr2[i]->epcId[0], EPC_ptr2[i]->epcId[1], EPC_ptr2[i]->tempe / 100.0, EPC_ptr2[i]->antID, EPC_ptr2[i]->rssi);
-        strcat(epc_data2, one_epc_data2);
-        strcat(epc_data2, ",");
-    }
-    epc_data2[strlen(epc_data2) - 1] = '\0';
-    size_t size2 = 0;
-    char *json_str2 = NULL;
-    size2 = asprintf(&json_str2, "{\"status\":\"200\",\"epc_cnt\":\"%d\",\"read_rate\":\"%d\",\"data\":[%s]}",
-                     epcCnt, epc_read_rate2, epc_data2);
-    free(epc_data2);
-
-    if (epcCnt != 0) // 有数据才上报
-    {
-
-        if (sys_info_config.sys_networking_mode == SYS_NETWORKING_UNB)
-        {
-            send_json_over_nb(json_str2);
-        }
-        else
-        {
-            mqtt_client_publish(send_topic, json_str2, size2, 0, 1);
-        }
-        const char *ip = get_effective_ip_str();
-        if (ip != NULL)
-        {
-            mqtt_client_publish(send_topic, json_str2, size2, 0, 1);
-        }
-    }
-
-    free(json_str2);
-}
 
 /*****************************************************
 函数名称：void RFID_MqttTimingTask(void *arg)
@@ -310,7 +256,7 @@ void RFID_MqttTimeTask(void *arg)
 
         // xEventGroupWaitBits(xEventGroup, TASK_1_EVENT_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
 
-        mqtt_publish_epc_data2();
+        publish_epc_data2();
         ESP_LOGI(TAG, "Timing task sending..,and time is %d", pushtime_count);
 
         // // 完成发送后，清除事件组标志位，允许任务二执行
@@ -378,8 +324,7 @@ void ctrl_rfid_mode(uint8_t mode)
     }
     else
     {
-        rfid_read_config.rfid_read_on_off = RFID_READ_OFF; // 读写器关
-        rfid_read_config.rfid_read_mode = RFID_READ_MODE_NULL;
+       RFID_StopRead();
     }
 }
 
@@ -514,7 +459,7 @@ void app_main(void)
     // sc16is752_i2c_init();
     // // sc16is752_init();
     // sc16is752_uart_init(SC16IS752_CHANNEL_A, 115200);
-
+    // sc16is752_uart_init(SC16IS752_CHANNEL_B, 19200);
     if (sc16is752_init_all() != ESP_OK)
     {
         ESP_LOGE("MAIN", "SC16IS752 initialization failed");
@@ -583,7 +528,10 @@ void app_main(void)
 
     fan_gpio_init();
 
+    ctrl_rfid_mode(0);
+    vTaskDelay(2000/portTICK_PERIOD_MS);
     ctrl_rfid_mode(2);
+
 
     while (1)
     {

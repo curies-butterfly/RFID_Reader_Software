@@ -86,7 +86,9 @@
         "typeinfo": "c",
         "cstdio": "c",
         "cmath": "c",
-        "usbh_modem_board.h": "c"
+        "usbh_modem_board.h": "c",
+        "datadeal.h": "c",
+        "data_deal.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "idf.portWin": "COM54",
