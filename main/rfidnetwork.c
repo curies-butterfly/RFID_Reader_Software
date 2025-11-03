@@ -37,7 +37,7 @@
 #include "hal/wdt_hal.h"//watchdog
 #include "tp1107.h"
 #include "nvs.h"
-
+#include "dev_info.h"
 
 static const char *TAG = "rfid_network";
 static const char *TAG_4G = "network_4G_module";
@@ -45,6 +45,10 @@ static const char *TAG_ETHERNET = "network_ethernet";
 static const char *TAG_MQTT = "mqtt";
 static const char *TAG_AP = "WiFi SoftAP";
 static const char *TAG_STA = "WiFi Sta";
+
+char chip_id_ssid_str[32];  // 设备ID作为AP的ssid
+
+
 /* STA Configuration */
 #define EXAMPLE_ESP_WIFI_STA_SSID           CONFIG_ESP_WIFI_REMOTE_AP_SSID
 #define EXAMPLE_ESP_WIFI_STA_PASSWD         CONFIG_ESP_WIFI_REMOTE_AP_PASSWORD
@@ -675,16 +679,25 @@ static void wifi_ap_sta_init(void) {
     esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();//创建一个默认的WIFI接入点AP的网络端口
     assert(ap_netif != NULL);  // 确保创建成功
 
+
+   
+    snprintf(chip_id_ssid_str, sizeof(chip_id_ssid_str), "RFID_AP_%012llX", chip_id);
+
     // 配置 AP 模式的 Wi-Fi 参数
     wifi_config_t ap_config = {
         .ap = {
-            .ssid = EXAMPLE_ESP_WIFI_AP_SSID,//ssid名称
+            // .ssid = chip_id_ssid_str,//ssid名称
             .password = EXAMPLE_ESP_WIFI_AP_PASSWD,//密钥
             .channel = EXAMPLE_ESP_WIFI_CHANNEL,//通道
             .max_connection = EXAMPLE_MAX_STA_CONN,//最大连接数
             .authmode = WIFI_AUTH_WPA2_PSK,//认证模式
         },
     };
+    //把芯片ID号作为AP SSID
+    // snprintf(chip_id_ssid_str, sizeof(chip_id_ssid_str), "RFID_AP%012llX", chip_id);
+    strncpy((char *)ap_config.ap.ssid, chip_id_ssid_str, sizeof(ap_config.ap.ssid) - 1);
+    ap_config.ap.ssid[sizeof(ap_config.ap.ssid) - 1] = '\0'; // 确保字符串结束符
+
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_config));//设置AP模式下的Wi-Fi参数
 
     // 创建 STA 模式的网络接口
