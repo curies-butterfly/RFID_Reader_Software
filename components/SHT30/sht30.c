@@ -1,79 +1,150 @@
 #include "sht30.h"
+#include "esp_log.h"
 
-#define I2C_MPU6050_SDA_IO   6
-#define I2C_MPU6050_SCL_IO   7 
-#define I2C_MASTER_FREQ_HZ   400000
+static const char *TAG = "SC16IS752";
 
-#define WRITE_BIT 0x0              /*!< I2C master write */
-#define READ_BIT  0x1              /*!< I2C master read */
-#define ACK_CHECK_EN 0x1           /*!< I2C master will check ack from slave*/
-#define ACK_CHECK_DIS 0x0          /*!< I2C master will not check ack from slave */
-#define ACK_VAL 0x0                /*!< I2C ack value */
-#define NACK_VAL 0x1               /*!< I2C nack value */
-
-sht30_data_t sht30_data;
+#define I2C_TIMEOUT_MS 100
 
 
-esp_err_t iic_init()
+esp_err_t sc16is752_i2c_init(void)
 {
-    i2c_config_t conf = 
-    {
+    i2c_config_t conf = {
         .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MPU6050_SDA_IO,
+        .sda_io_num = SC16IS752_SDA_IO,
+        .scl_io_num = SC16IS752_SCL_IO,
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_io_num = I2C_MPU6050_SCL_IO,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
+        .master.clk_speed = SC16IS752_FREQ_HZ,
     };
-    esp_err_t err = i2c_param_config(I2C_NUM_1, &conf);
-    if (err != ESP_OK) {
-        return err;
-    }
-    return i2c_driver_install(I2C_NUM_1, conf.mode, 0, 0, 0);
+    ESP_ERROR_CHECK(i2c_param_config(SC16IS752_I2C_PORT, &conf));
+    return i2c_driver_install(SC16IS752_I2C_PORT, conf.mode, 0, 0, 0);
 }
 
+// ------------------ 基础读写函数 ------------------
 
-/*******************************************************************
- 温湿度获取函数
-函数原型: SHT30_read_result(uint8_t addr);
-功能: 用来接收从器件采集并合成温湿度
-********************************************************************/
-void SHT30_read_result(uint8_t addr, sht30_data_t *sht30_data)
+esp_err_t sc16is752_write_register(i2c_port_t i2c_num, uint8_t addr, uint8_t ch, uint8_t reg, uint8_t val)
 {
-	uint16_t tem,hum;
-	uint8_t buff[6];
-	float Temperature=0;
-	float Humidity=0;
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, addr << 1 | WRITE_BIT, ACK_CHECK_EN);//发送写命令，设备地址+读写位，并等待ACK信号
-    i2c_master_write_byte(cmd, 0x2c, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, 0x06, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    i2c_master_cmd_begin(I2C_NUM_1, cmd, 1);
-    i2c_cmd_link_delete(cmd);
-    vTaskDelay(50/portTICK_PERIOD_MS);
-    
-    i2c_cmd_handle_t cmd1 = i2c_cmd_link_create();
-    i2c_master_start(cmd1);
-    i2c_master_write_byte(cmd1, (addr << 1) | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read(cmd1, buff, 6 - 1, ACK_VAL);
-    i2c_master_read_byte(cmd1, buff+5, NACK_VAL);
-    i2c_master_stop(cmd1);
-    esp_err_t ret = i2c_master_cmd_begin(I2C_NUM_1, cmd1, 1000 / portTICK_PERIOD_MS);
-    i2c_cmd_link_delete(cmd1);
+    uint8_t buf[2];
+    buf[0] = (reg << 3) | (ch << 1); // Subaddress 格式
+    buf[1] = val;
 
-    tem = ((buff[0]<<8) | buff[1]);//温度拼接
-	hum = ((buff[3]<<8) | buff[4]);//湿度拼接
-
-	/*转换实际温度*/
-	Temperature= (175.0*(float)tem/65535.0-45.0) ;// T = -45 + 175 * tem / (2^16-1)
-	Humidity= (100.0*(float)hum/65535.0);// RH = hum*100 / (2^16-1)
-
-
-    sht30_data->Temperature = Temperature;
-    sht30_data->Humidity = Humidity;
-    hum=0;
-	tem=0;
+    return i2c_master_write_to_device(i2c_num, addr, buf, 2, I2C_TIMEOUT_MS / portTICK_PERIOD_MS);
 }
 
+esp_err_t sc16is752_read_register(i2c_port_t i2c_num, uint8_t addr, uint8_t ch, uint8_t reg, uint8_t *data)
+{
+    uint8_t sub = (reg << 3) | (ch << 1);
+    esp_err_t ret = i2c_master_write_read_device(i2c_num, addr, &sub, 1, data, 1, I2C_TIMEOUT_MS / portTICK_PERIOD_MS);
+    return ret;
+}
+
+// ------------------ 初始化 ------------------
+
+esp_err_t sc16is752_init(i2c_port_t i2c_num, uint8_t addr)
+{
+    ESP_LOGI(TAG, "SC16IS752 init start");
+
+    // 复位 FIFO
+    sc16is752_write_register(i2c_num, addr, SC16IS752_CHANNEL_A, SC16IS752_FCR, 0x06);
+    sc16is752_write_register(i2c_num, addr, SC16IS752_CHANNEL_B, SC16IS752_FCR, 0x06);
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+
+    ESP_LOGI(TAG, "SC16IS752 init done");
+    return ESP_OK;
+}
+
+// ------------------ UART配置 ------------------
+
+esp_err_t sc16is752_uart_init(uint8_t ch, uint32_t baudrate)
+{
+    uint16_t divisor = 1843200 / baudrate / 16;
+
+    // 打开 DLAB 位
+    sc16is752_write_register(SC16IS752_I2C_PORT, SC16IS752_ADDR, ch, SC16IS752_LCR, 0x80);
+
+    // 写 DLL、DLH
+    sc16is752_write_register(SC16IS752_I2C_PORT, SC16IS752_ADDR, ch, SC16IS752_DLL, divisor & 0xFF);
+    sc16is752_write_register(SC16IS752_I2C_PORT, SC16IS752_ADDR, ch, SC16IS752_DLH, (divisor >> 8) & 0xFF);
+
+    // 关闭 DLAB，设置 8N1
+    sc16is752_write_register(SC16IS752_I2C_PORT, SC16IS752_ADDR, ch, SC16IS752_LCR, 0x03);
+
+    // 启用 FIFO
+    sc16is752_write_register(SC16IS752_I2C_PORT, SC16IS752_ADDR, ch, SC16IS752_FCR, 0x07);
+
+    ESP_LOGI(TAG, "UART channel %c initialized, baud=%" PRIu32,
+             (ch == SC16IS752_CHANNEL_A) ? 'A' : 'B', baudrate);
+    return ESP_OK;
+}
+
+// ------------------ 发送函数 ------------------
+
+esp_err_t sc16is752_send_byte(uint8_t ch, uint8_t data)
+{
+    uint8_t lsr;
+    int retry = 0;
+
+    do {
+        sc16is752_read_register(SC16IS752_I2C_PORT, SC16IS752_ADDR, ch, SC16IS752_LSR, &lsr);
+        if (lsr & SC16IS752_LSR_THRE) break;
+        vTaskDelay(pdMS_TO_TICKS(1));
+        retry++;
+    } while (retry < 100);
+
+    if (!(lsr & SC16IS752_LSR_THRE)) {
+        ESP_LOGW(TAG, "TX not ready on channel %c", (ch == 0) ? 'A' : 'B');
+        return ESP_FAIL;
+    }
+
+    return sc16is752_write_register(SC16IS752_I2C_PORT, SC16IS752_ADDR, ch, SC16IS752_THR, data);
+}
+
+
+esp_err_t sc16is752_send_buffer(uint8_t ch, const uint8_t *buf, size_t len)
+{
+    esp_err_t ret;
+    for (size_t i = 0; i < len; i++) {
+        ret = sc16is752_send_byte(ch, buf[i]);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Send byte failed at index %d", i);
+            return ret;  // 发送失败就返回
+        }
+        // 可根据需要添加适当延时，防止发送过快
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+    return ESP_OK;
+}
+
+
+esp_err_t sc16is752_init_all(void)
+{
+    esp_err_t ret;
+
+    ret = sc16is752_i2c_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE("SC16IS752", "I2C init failed");
+        return ret;
+    }
+
+    ret = sc16is752_init(SC16IS752_I2C_PORT, SC16IS752_ADDR);
+    if (ret != ESP_OK) {
+        ESP_LOGE("SC16IS752", "SC16IS752 chip init failed");
+        return ret;
+    }
+
+    ret = sc16is752_uart_init(SC16IS752_CHANNEL_A, 115200);
+    if (ret != ESP_OK) {
+        ESP_LOGE("SC16IS752", "UART init failed");
+        return ret;
+    }
+
+    ret = sc16is752_send_byte(SC16IS752_CHANNEL_A, 'A');
+    if (ret != ESP_OK) {
+        ESP_LOGE("SC16IS752", "Send byte failed");
+        return ret;
+    } else {
+        ESP_LOGI("SC16IS752", "Send byte 'A' success");
+    }
+    return ESP_OK;
+}
