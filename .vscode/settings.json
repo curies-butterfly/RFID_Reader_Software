@@ -89,7 +89,8 @@
         "usbh_modem_board.h": "c",
         "datadeal.h": "c",
         "data_deal.h": "c",
-        "sc16is752.h": "c"
+        "sc16is752.h": "c",
+        "app_tasks.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "idf.portWin": "COM54",

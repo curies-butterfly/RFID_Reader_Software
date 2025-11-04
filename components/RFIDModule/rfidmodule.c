@@ -36,7 +36,15 @@ rfid_read_config_t rfid_read_config = {
 };
 
 #define EXAMPLE_ESP_Label_Mode      CONFIG_Label_Mode
+
 uint8_t type_epc;
+Dictionary DicPower1;
+CapacityInfo_t CapacityInfo;
+WorkFreq_t WorkFreq;
+uint8_t freaRang = 0;
+PoweInfo_t PoweInfo;
+result_t rfidready_flag; // rfid初始化标志位
+
 /*****************************************************
 函数名称：void ClearRecvFlag()
 函数功能：清除接收标志
@@ -945,5 +953,81 @@ TagType get_tag_type(uint8_t *data, uint16_t dataLen) {
         return TAG_TYPE_XY;
     }
     return TAG_TYPE_UNKNOWN;
+}
+
+
+// RFID 模组初始化，显示和配置相关参数
+void rfidModuleInit()
+{
+    result_t ret = Error;
+    int timeout = 3;
+    int timecnt = 0;
+    while (ret != Ok)
+    {
+        timecnt++;
+        ret = RFID_StopRead();
+        if (timecnt > timeout)
+        {
+            return;
+        }
+    }
+    DicPower1.AntennaNo = 0x01;
+    DicPower1.Power = 33;
+    RFID_SetPower(DicPower1, 0, 1);
+    DicPower1.AntennaNo = 0x02;
+    RFID_SetPower(DicPower1, 0, 1);
+    DicPower1.AntennaNo = 0x03;
+    RFID_SetPower(DicPower1, 0, 1);
+    DicPower1.AntennaNo = 0x04;
+    RFID_SetPower(DicPower1, 0, 1);
+
+    if (Ok == RFID_GetCapacity(&CapacityInfo))
+    {
+        RFID_ShowCapacityInfo(CapacityInfo);
+    }
+    else
+        printf("读写器能力查询失败\r\n");
+
+    if (Ok == RFID_GetFreqRanger(&freaRang))
+        printf("读写器RF频段:%d,%s\r\n", freaRang, FreqTab[freaRang]);
+    else
+        printf("读写器RF频段查询失败\r\n");
+
+    if (Ok == RFID_GetPower(&PoweInfo))
+        RFID_ShowPower(PoweInfo);
+    else
+        printf("读写器功率查询失败\r\n");
+
+    if (Ok != RFID_GetWorkFreq(&WorkFreq))
+        printf("读写器工作频率查询失败\r\n");
+
+    if (Ok != RFID_StopRead())
+        printf("RFID stop read error\r\n");
+}
+
+void ctrl_rfid_mode(uint8_t mode)
+{
+    rfid_read_config_t rfid_read_config;
+
+    if (mode == 2) // 连续模式
+    {
+        rfid_read_config.rfid_read_on_off = RFID_READ_ON;            // 读写器开
+        rfid_read_config.rfid_read_mode = RFID_READ_MODE_CONTINUOUS; // 连续模式
+        rfid_read_config.ant_sel = 0x0F;                             // 00001111 ANT4 ANT3 ANT2 ANT1
+        rfid_read_config.read_interval_time = 1000;                  // 读取频率间隔
+        rfidready_flag = RFID_ReadEPC(rfid_read_config);
+    }
+    else if (mode == 1) // 单次模式
+    {
+        rfid_read_config.rfid_read_on_off = RFID_READ_ON;      // 读写器开
+        rfid_read_config.rfid_read_mode = RFID_READ_MODE_ONCE; // 单次模式
+        rfid_read_config.ant_sel = 0x0F;                       // 00001111 ANT4 ANT3 ANT2 ANT1
+        rfid_read_config.read_interval_time = 1000;            // 读取频率间隔
+        rfidready_flag = RFID_ReadEPC(rfid_read_config);
+    }
+    else
+    {
+       RFID_StopRead();
+    }
 }
 

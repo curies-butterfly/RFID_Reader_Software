@@ -7,6 +7,8 @@
 
 #define ALPHA 0.95f // α=0.2， 一阶低通滤波
 
+
+
 //基本数据帧
 typedef struct 
 {
@@ -153,5 +155,7 @@ TagType get_tag_type(uint8_t *data, uint16_t dataLen);
 double calculate_temperature(uint16_t adc_raw, uint16_t cali_raw);
 void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr);
 void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr);
+void rfidModuleInit();
+void ctrl_rfid_mode(uint8_t mode);
 
 #endif
