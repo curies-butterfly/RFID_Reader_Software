@@ -1,5 +1,5 @@
-#ifndef     SHT30__H_
-#define     SHT30__H_
+#ifndef     SC16IS752__H_
+#define     SC16IS752__H_
 
 
 #include "esp_err.h"

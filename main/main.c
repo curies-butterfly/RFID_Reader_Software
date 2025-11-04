@@ -13,7 +13,7 @@
 #include "rfidmodule.h"
 #include "rfidcommon.h"
 #include "modbus_rtu.h"
-#include "sht30.h"
+#include "sc16is752.h"
 #include "led.h"
 #include <stdio.h>
 #include <stdint.h>

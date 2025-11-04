@@ -21,7 +21,7 @@
 #include "parameter.h"
 #include <time.h>
 #include <sys/time.h>
-#include "sht30.h"
+// #include "sht30.h"
 #include "rfidmodule.h"
 
 #define debug_flag 1

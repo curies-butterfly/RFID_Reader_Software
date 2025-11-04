@@ -1,4 +1,4 @@
-#include "sht30.h"
+#include "sc16is752.h"
 #include "esp_log.h"
 
 static const char *TAG = "SC16IS752";

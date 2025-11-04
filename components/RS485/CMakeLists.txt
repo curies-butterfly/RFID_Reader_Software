@@ -1,6 +1,6 @@
 set(bsp_src "modbus_rtu.c")
 
-set(requires "driver_uart" "SHT30" "RFIDModule")
+set(requires "driver_uart" "RFIDModule")
 
 idf_component_register(
     SRCS ${bsp_src}

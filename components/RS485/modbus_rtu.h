@@ -13,7 +13,7 @@
 #include "driver/gpio.h"
 #include "rfidcommon.h"
 #include "driver_uart.h"
-#include "sht30.h"
+// #include "sht30.h"
 #include "rfidmodule.h"
 
 // 标签个数
