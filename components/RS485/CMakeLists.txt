@@ -7,5 +7,5 @@ idf_component_register(
     INCLUDE_DIRS
         "."
     REQUIRES ${requires}
-    PRIV_REQUIRES main     # 声明对 main 组件的依赖
+    # PRIV_REQUIRES main     # 声明对 main 组件的依赖
 )
