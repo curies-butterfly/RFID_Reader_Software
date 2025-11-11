@@ -42,6 +42,7 @@ extern "C" {
 
 void RFID_MqttTimeTask(void *arg);
 void RFID_MqttErrTask(void *arg);
+void Screen_DataTask(void *arg);
 
 
 #ifdef __cplusplus

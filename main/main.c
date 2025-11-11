@@ -62,10 +62,6 @@ char *strcop = "mqtt://101.37.253.97:4635";
 
 
 
-
-
-
-
 void app_main(void)
 {
 
@@ -127,9 +123,9 @@ void app_main(void)
     }
 
     // const char *msg = "Hello SC16IS752!";
-    uint8_t sendbuf1[] = {0x70, 0x61, 0x67, 0x65, 0x30, 0x2E, 0x74, 0x31, 0x2E, 0x74, 0x78, 0x74, 0x3D, 0x22};
+
     // ret1 = sc16is752_send_buffer(SC16IS752_CHANNEL_A, (const uint8_t *)sendbuf1, strlen(sendbuf1));
-    sc16is752_send_buffer(SC16IS752_CHANNEL_A, sendbuf1, sizeof(sendbuf1));
+    // sc16is752_send_buffer(SC16IS752_CHANNEL_A, sendbuf1, sizeof(sendbuf1));
 
     // xEventGroup = xEventGroupCreate();
     // if (xEventGroup == NULL) {
@@ -144,7 +140,8 @@ void app_main(void)
     xTaskCreate(RFID_ReadEpcTask, "RFID_ReadEpcTask", 4096 * 2, NULL, configMAX_PRIORITIES - 4, NULL);
     xTaskCreate(RFID_MqttTimeTask, "RFID_MqttTimeTask", 4096 * 2, NULL, configMAX_PRIORITIES - 5, NULL);
     // xTaskCreate(RFID_MqttErrTask, "RFID_MqttErrTask", 4096*2, NULL,configMAX_PRIORITIES-5, NULL);
-
+    xTaskCreate(Screen_DataTask, "Screen_DataTask", 2048, NULL, configMAX_PRIORITIES - 8, NULL);//tjc屏幕显示温度标签数据
+    
     // xTaskCreate(modbusRtuDeal_Task, "modbusRtuDeal_Task", 4096*2, NULL,configMAX_PRIORITIES-6, NULL);
 
     wdt_hal_feed(&rwdt_ctx); // 喂一次狗
@@ -161,7 +158,7 @@ void app_main(void)
     {
         wdt_hal_feed(&rwdt_ctx);
         printf("free heap size: %d\r\n", xPortGetFreeHeapSize());
-        sc16is752_send_buffer(SC16IS752_CHANNEL_A, sendbuf1, sizeof(sendbuf1));
+        // sc16is752_send_buffer(SC16IS752_CHANNEL_A, sendbuf1, sizeof(sendbuf1));
         ntc_temp_adc_run();
         // oled_data_display(oled);
         vTaskDelay(2000 / portTICK_PERIOD_MS);

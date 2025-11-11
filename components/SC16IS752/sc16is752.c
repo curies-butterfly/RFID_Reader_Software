@@ -50,6 +50,12 @@ esp_err_t sc16is752_init(i2c_port_t i2c_num, uint8_t addr)
 
     vTaskDelay(pdMS_TO_TICKS(10));
 
+    // 再次写入 0x07 重新启用 FIFO
+    sc16is752_write_register(i2c_num, addr, SC16IS752_CHANNEL_A, SC16IS752_FCR, 0x07);
+    sc16is752_write_register(i2c_num, addr, SC16IS752_CHANNEL_B, SC16IS752_FCR, 0x07);
+
+    vTaskDelay(pdMS_TO_TICKS(10));
+
     ESP_LOGI(TAG, "SC16IS752 init done");
     return ESP_OK;
 }
@@ -139,12 +145,15 @@ esp_err_t sc16is752_init_all(void)
         return ret;
     }
 
-    ret = sc16is752_send_byte(SC16IS752_CHANNEL_A, 'A');
-    if (ret != ESP_OK) {
-        ESP_LOGE("SC16IS752", "Send byte failed");
-        return ret;
-    } else {
-        ESP_LOGI("SC16IS752", "Send byte 'A' success");
-    }
+
+
+    // ret = sc16is752_send_byte(SC16IS752_CHANNEL_A, 'A');
+    // if (ret != ESP_OK) {
+    //     ESP_LOGE("SC16IS752", "Send byte failed");
+    //     return ret;
+    // } else {
+    //     ESP_LOGI("SC16IS752", "Send byte 'A' success");
+    // }
+
     return ESP_OK;
 }

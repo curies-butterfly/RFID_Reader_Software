@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "data_deal.h"
 #include "dev_info.h"
+#include "sc16is752.h"
 
 /*****************************************************
 函数名称：void RFID_MqttTimingTask(void *arg)
@@ -124,3 +125,53 @@ void RFID_MqttErrTask(void *arg)
     }
 }
 
+
+/*
+ * 屏幕数据任务
+ */
+
+void Screen_DataTask(void *arg)
+{
+    const uint8_t prefix[] = {0x70, 0x61, 0x67, 0x65, 0x30, 0x2E, 0x74, 0x30,
+                              0x2E, 0x74, 0x78, 0x74, 0x3D, 0x22}; // page0.t0.txt="
+
+    const uint8_t suffix[] = {0x22, 0xFF, 0xFF, 0xFF}; // 结束符号
+
+    uint8_t sendBuf[128];
+    uint8_t index = 0;
+
+    while (1)
+    {
+        if (epcCnt > 0 && LTU3_Lable[index] != NULL)
+        {
+            EPC_Info_t *epc = LTU3_Lable[index];
+            int16_t tempX10 = (int16_t)(epc->tempe / 10);
+
+            char data_str[32];
+            sprintf(data_str, "%02x%02x%d",
+                    epc->epcId[0], epc->epcId[1], tempX10);
+
+            // 重新拼接：完全手动控制位置
+            uint16_t pos = 0;
+            memcpy(sendBuf + pos, prefix, sizeof(prefix));
+            pos += sizeof(prefix);
+
+            memcpy(sendBuf + pos, data_str, strlen(data_str));
+            pos += strlen(data_str);
+
+            memcpy(sendBuf + pos, suffix, sizeof(suffix));
+            pos += sizeof(suffix);
+
+            // 发送正确长度
+            sc16is752_send_buffer(SC16IS752_CHANNEL_A, sendBuf, pos);
+
+            printf("Screen Send (%d bytes): %s\n", pos, data_str);
+
+            index++;
+            if (index >= epcCnt)
+                index = 0;
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
