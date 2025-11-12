@@ -108,7 +108,7 @@ void publish_epc_data2()
         
         if(sys_info_config.sys_networking_mode==SYS_NETWORKING_UNB){
         //    send_json_over_nb(json_str2); 
-           loraInfoToGateway();   
+           loraInfoToGateway();  //通过LoRa 将信息发送到网关 
         }else{
             Json_info_to_middleware();//json data to middleware
         }

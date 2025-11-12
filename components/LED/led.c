@@ -60,3 +60,8 @@ void fan_gpio_set(bool on)
 {
     gpio_set_level(FAN_GPIO, on ? 1 : 0);
 }
+
+
+
+
+

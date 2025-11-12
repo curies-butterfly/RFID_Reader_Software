@@ -1565,7 +1565,7 @@ void OLEDDisplay_display(OLEDDisplay_t *oled)
 //     OLEDDisplay_flipScreenVertically(oled); // 反转镜像
 // }
 
-//  led_indicator_start(s_led_run_status_handle, BLINK_CONNECTING);
+ 
 
 // OLEDDisplay_t *oled = OLEDDisplay_init(I2C_NUM_1,0x78,I2C_MASTER_SDA_IO,I2C_MASTER_SCL_IO);
 

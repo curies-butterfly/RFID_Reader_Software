@@ -145,8 +145,6 @@ esp_err_t sc16is752_init_all(void)
         return ret;
     }
 
-
-
     // ret = sc16is752_send_byte(SC16IS752_CHANNEL_A, 'A');
     // if (ret != ESP_OK) {
     //     ESP_LOGE("SC16IS752", "Send byte failed");

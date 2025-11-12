@@ -3,8 +3,6 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
-#include "esp_chip_info.h"
-#include "esp_system.h"
 #include "esp_log.h"
 #include "driver/uart.h"
 #include "string.h"
@@ -38,12 +36,10 @@
 #include "parameter.h"
 #include "sdkconfig.h"
 #include "dev_info.h"
-#include "OLEDDisplay.h"
-#include "OLEDDisplayFonts.h"
+// #include "OLEDDisplay.h"
+// #include "OLEDDisplayFonts.h"
 #include "ntc_temp_adc.h"
 #include "hal/wdt_hal.h"
-#include "at.h"
-#include "tp1107.h"
 
 #include "data_deal.h"
 #include "app_tasks.h"
@@ -140,7 +136,7 @@ void app_main(void)
     xTaskCreate(RFID_ReadEpcTask, "RFID_ReadEpcTask", 4096 * 2, NULL, configMAX_PRIORITIES - 4, NULL);
     xTaskCreate(RFID_MqttTimeTask, "RFID_MqttTimeTask", 4096 * 2, NULL, configMAX_PRIORITIES - 5, NULL);
     // xTaskCreate(RFID_MqttErrTask, "RFID_MqttErrTask", 4096*2, NULL,configMAX_PRIORITIES-5, NULL);
-    xTaskCreate(Screen_DataTask, "Screen_DataTask", 2048, NULL, configMAX_PRIORITIES - 8, NULL);//tjc屏幕显示温度标签数据
+    xTaskCreate(Screen_DataTask, "Screen_DataTask", 4096, NULL, configMAX_PRIORITIES - 8, NULL);//tjc屏幕显示温度标签数据
     
     // xTaskCreate(modbusRtuDeal_Task, "modbusRtuDeal_Task", 4096*2, NULL,configMAX_PRIORITIES-6, NULL);
 
@@ -153,6 +149,8 @@ void app_main(void)
     ctrl_rfid_mode(0);
     vTaskDelay(2000/portTICK_PERIOD_MS);
     ctrl_rfid_mode(2);
+
+    led_indicator_start(s_led_run_status_handle, BLINK_CONNECTING);// 运行状态指示灯启动 1s频率闪烁
 
     while (1)
     {

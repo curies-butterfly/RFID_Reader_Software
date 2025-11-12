@@ -6,11 +6,9 @@
 #include "freertos/timers.h"
 
 
-static const char *TAG = "TP1107";
-#define U2_TXD_PIN 21//(GPIO_NUM_19)
-#define U2_RXD_PIN 47//(GPIO_NUM_5)
-static const int U2_RX_BUF_SIZE = 2048;
 
+static const char *TAG = "TP1107";
+static const int U2_RX_BUF_SIZE = 2048;
 
 static const struct at_urc tp1107_urc_table[] = { { "joined", "\r\n", urc_func1 }, { "+NNMI", "\r\n", urc_func2 }, };
 static const char GO_AT_MODE[] = "+++\r\n";
@@ -33,11 +31,11 @@ static const char *COMMAND_RESPS[] = { "TP1107", "FF", "joined", "UL", "NONE" };
 #define  TP1107_DEVICE_NAME "tp1107"
 #define  TP1107_CLIENT_NAME "uart2"
 
-//28
-#define  TP1107_RST_PIN 35
 
-//29
-#define  TP1107_WAKE_PIN 36
+#define  TP1107_RST_PIN     35
+#define  TP1107_WAKE_PIN    36
+#define  U2_TXD_PIN         21//(GPIO_NUM_19)
+#define  U2_RXD_PIN         47//(GPIO_NUM_5)
 
 #define  TP1107_DEFAUT_ESN "FF01FFFF0000"
 

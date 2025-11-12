@@ -468,7 +468,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 static void mqtt_app_start(void)
 {
-    ESP_LOGI(TAG,"ABC: %s\r\n",sys_info_config.mqtt_address);
+    ESP_LOGI(TAG,"ABC: %s",sys_info_config.mqtt_address);
     // 创建遗嘱消息的 JSON 对象
     cJSON *lwt_json = cJSON_CreateObject();
     cJSON_AddStringToObject(lwt_json, "id", lwt_content);
