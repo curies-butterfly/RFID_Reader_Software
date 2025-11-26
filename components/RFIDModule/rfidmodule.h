@@ -157,5 +157,6 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr);
 void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr);
 void rfidModuleInit();
 void ctrl_rfid_mode(uint8_t mode);
+void RFID_SendCmdConfigEpcBaseband(void);
 
 #endif

@@ -1003,6 +1003,8 @@ void rfidModuleInit()
 
     if (Ok != RFID_StopRead())
         printf("RFID stop read error\r\n");
+
+    RFID_SendCmdConfigEpcBaseband();//配置基带信息指令
 }
 
 void ctrl_rfid_mode(uint8_t mode)
@@ -1034,4 +1036,66 @@ void ctrl_rfid_mode(uint8_t mode)
       
     }
 }
+
+
+/**
+ * @brief 发送RFID配置EPC基带命令
+ * 
+ * 该函数用于向RFID设备发送配置EPC基带参数的命令，并等待设备响应。
+ * 配置参数包括基带通信的相关设置。
+ * 
+ * @param 无
+ * 
+ * @return 无
+ * 
+ * @note 该函数会清除接收标志，发送配置帧，然后等待并解析设备响应
+ */
+void RFID_SendCmdConfigEpcBaseband(void)
+{
+    BaseDataFrame_t frame;
+    /* 定义EPC基带配置参数数组 */
+    uint8_t params[8] = {0x01,0x01,0x02,0x04,0x03,0x02,0x04,0x02};
+    //根据数据手册里的协议 
+    /*
+    *帧头：5A
+    *协议控制字：00 01 02 0B
+    *帧长度：00 08
+    *数据参数：01 01 02 04 03 02 04 02
+        参数1：0x01，参数名称:EPC 基带速率
+        参数2：0x01，表示设置 Tari=25us,Miller4,LHF=250KHz（密集模式）
+        参数3：0x02，参数名称:默认 Q 值
+        参数4：0x04，表示设置 Q值为4
+        参数5：0x03，参数名称:Session
+        参数6：0x02，表示设置 Session2
+        参数7：0x04，参数名称:盘存标志参数
+        参数8：0x02，表示设置 Flag A+B 双面盘存
+    *CRC 校验码：9C 7E
+    */
+
+    /* 构造协议控制字节 */
+    frame.ProCtrl[0] = 0x00;
+    frame.ProCtrl[1] = 0x01;
+    frame.ProCtrl[2] = 0x02;
+    frame.ProCtrl[3] = 0x0B;
+    frame.DevAddr   = 0x00;
+    frame.DataLen   = sizeof(params);
+    frame.pData     = params;
+
+    /* 清除接收标志并发送基础帧 */
+    ClearRecvFlag();
+    RFID_SendBaseFrame(frame);
+
+    /* 等待响应并处理结果 */
+    if (WaitFlag(20) == Ok) {
+        if (UARTRecvFrame.ProCtrl[3] == 0x0B && UARTRecvFrame.pData[0] == 0x00) {
+            printf("EPC baseband config: ok\r\n");
+        } else {
+            printf("EPC baseband config: failed, code=0x%02X\r\n", UARTRecvFrame.pData[0]);
+        }
+    } else {
+        printf("EPC baseband config: timeout\r\n");
+    }
+}
+
+
 
