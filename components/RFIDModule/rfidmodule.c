@@ -1027,7 +1027,11 @@ void ctrl_rfid_mode(uint8_t mode)
     }
     else
     {
-       RFID_StopRead();
+       while( RFID_StopRead()){
+        printf("RFID stop read error\r\n");
+        vTaskDelay(2000/portTICK_PERIOD_MS);
+       }
+      
     }
 }
 
