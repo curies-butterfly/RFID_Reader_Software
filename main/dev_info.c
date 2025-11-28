@@ -29,6 +29,7 @@ config_info_t g_config = {
     .wifi_ssid = "",
     .wifi_psd = "",
     .mqtt_addr = "",
+    .epcbb_type = "",
 };
 
 void get_chip_IDinfo(void)
@@ -145,19 +146,24 @@ static void parse_config_line(const char *line)
         else if (strncmp(token, "MQTT=", 5) == 0) {
             strncpy(g_config.mqtt_addr, token + 5, sizeof(g_config.mqtt_addr) - 1);
         }
-
+        else if (strncmp(token, "EPCBB_TYPE=", 11) == 0) {
+            memset(g_config.epcbb_type, 0, sizeof(g_config.epcbb_type));
+            strncpy(g_config.epcbb_type, token + 11, sizeof(g_config.epcbb_type) - 1);
+        }
         token = strtok(NULL, ";");
     }
 
     ESP_LOGI(TAG,
-             "Parsed Config: 4G=%d, ETH=%d, LORA=%d, SSID=%s, PSD=%s, TYPE=%s, MQTT=%s",
+             "Parsed Config: 4G=%d, ETH=%d, LORA=%d, SSID=%s, PSD=%s, TYPE=%s, MQTT=%s, EPCBB_TYPE=%s",
              g_config.enable_4g,
              g_config.enable_eth,
              g_config.enable_lora,
              g_config.wifi_ssid,
              g_config.wifi_psd,
              g_config.label_mode,
-             g_config.mqtt_addr);
+             g_config.mqtt_addr,
+             g_config.epcbb_type
+            );
 }
 
 static void set_nvs_LabelType(const char *label_mode_str){

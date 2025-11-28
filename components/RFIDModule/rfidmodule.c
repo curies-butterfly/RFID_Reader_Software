@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include "rfidnetwork.h"
 #include <math.h>
+#include "dev_info.h"
 
 static const char *TAG = "RFID_Del";
 
@@ -1004,7 +1005,10 @@ void rfidModuleInit()
     if (Ok != RFID_StopRead())
         printf("RFID stop read error\r\n");
 
-    RFID_SendCmdConfigEpcBaseband();//配置基带信息指令
+    if (g_config.epcbb_type[0] != '\0') { 
+        RFID_SendCmdConfigEpcBaseband(); //配置基带信息指令
+    }
+ 
 }
 
 void ctrl_rfid_mode(uint8_t mode)
@@ -1054,9 +1058,20 @@ void RFID_SendCmdConfigEpcBaseband(void)
 {
     BaseDataFrame_t frame;
     /* 定义EPC基带配置参数数组 */
-    uint8_t params[8] = {0x01,0x01,0x02,0x04,0x03,0x02,0x04,0x02};
+    uint8_t params_n604[8] = {0x01,0x01,0x02,0x04,0x03,0x02,0x04,0x02};//模组N604
+    uint8_t params_n704[8] = {0x01,0x02,0x02,0x04,0x03,0x02,0x04,0x02};//模组N704
+
+    const char *RFID_bb_type = g_config.epcbb_type;
+    if (RFID_bb_type[0] == '\0') return;
+    uint8_t *params = NULL;
+    if (strncmp(RFID_bb_type, "N604", 4) == 0) params = params_n604;
+    else if (strncmp(RFID_bb_type, "N704", 4) == 0) params = params_n704;
+    else return;
+    ESP_LOGI(TAG, "epcbb_type set @:%s", RFID_bb_type);
     //根据数据手册里的协议 
+    
     /*
+    注意：模组N604 基带速率设置为1； 模组N704在识别星沿标签时需要将基带速率设置成0或者2
     *帧头：5A
     *协议控制字：00 01 02 0B
     *帧长度：00 08
@@ -1071,6 +1086,8 @@ void RFID_SendCmdConfigEpcBaseband(void)
         参数8：0x02，表示设置 Flag A+B 双面盘存
     *CRC 校验码：9C 7E
     */
+
+
 
     /* 构造协议控制字节 */
     frame.ProCtrl[0] = 0x00;
@@ -1096,6 +1113,5 @@ void RFID_SendCmdConfigEpcBaseband(void)
         printf("EPC baseband config: timeout\r\n");
     }
 }
-
 
 

@@ -11,6 +11,7 @@ typedef struct {
     char wifi_psd[64];
     char label_mode[8];
     char mqtt_addr[64];
+    char epcbb_type[8];
 } config_info_t;
 extern config_info_t g_config;
 
