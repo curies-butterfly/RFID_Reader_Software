@@ -57,7 +57,6 @@ char *strcop = "mqtt://101.37.253.97:4635";
 /*      end             */
 
 
-
 void app_main(void)
 {
 
@@ -81,7 +80,7 @@ void app_main(void)
         ESP_ERROR_CHECK(nvs_flash_init());
     }
 
-    wait_for_config_or_timeout(); // 串口0配置
+    wait_for_config_or_timeout(); // 串口0配置 系统运行参数配置 
 
     /* Initialize default TCP/IP stack */
     ESP_ERROR_CHECK(esp_netif_init()); // 初始化网络接口
@@ -118,11 +117,6 @@ void app_main(void)
         return;
     }
 
-    // const char *msg = "Hello SC16IS752!";
-
-    // ret1 = sc16is752_send_buffer(SC16IS752_CHANNEL_A, (const uint8_t *)sendbuf1, strlen(sendbuf1));
-    // sc16is752_send_buffer(SC16IS752_CHANNEL_A, sendbuf1, sizeof(sendbuf1));
-
     // xEventGroup = xEventGroupCreate();
     // if (xEventGroup == NULL) {
     //     ESP_LOGE("app_main", "Event group creation failed!");
@@ -156,7 +150,6 @@ void app_main(void)
     {
         wdt_hal_feed(&rwdt_ctx);
         printf("free heap size: %d\r\n", xPortGetFreeHeapSize());
-        // sc16is752_send_buffer(SC16IS752_CHANNEL_A, sendbuf1, sizeof(sendbuf1));
         ntc_temp_adc_run();
         // oled_data_display(oled);
         vTaskDelay(2000 / portTICK_PERIOD_MS);

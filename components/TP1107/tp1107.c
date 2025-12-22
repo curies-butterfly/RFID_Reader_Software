@@ -421,7 +421,7 @@ static void unb1_entry(void *parameter)
                     res = unb_data_send_direct(device, unbbuffer1, len / 2);
                     vTaskDelay(pdMS_TO_TICKS(500));
                     err_tick++;
-                    ESP_LOGE(TAG, "[%s] send err tick:%d", device->device_name, err_tick);
+                    // ESP_LOGE(TAG, "[%s] send err tick:%d", device->device_name, err_tick);
 
                     // 错误处理
                     if (err_tick >= 10)
@@ -652,11 +652,6 @@ int unb_tp1107_init(void)
         ESP_LOGE("TIMER", "Failed to start heartbeat timer");
     }
 
-#if UNB_DOUBLE
-
-    unb_tp1107_rea_init(&tp1107_2, tp1107_2_urc_table);
-
-#endif
 
     const uint8_t UNB1_TASK_PRIORITY = 15; // 优先级（ESP-IDF范围0-25）
     TaskHandle_t task_handle = NULL;

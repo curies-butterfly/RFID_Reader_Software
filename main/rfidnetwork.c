@@ -843,6 +843,7 @@ void network_init(void)
     {
         // module_4G_init();
         // ethernet_w5500_init();
+        printf("=========UNB mode=========\r\n");
         unb_tp1107_init(); // tp1107初始化
     }
     else

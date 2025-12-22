@@ -78,41 +78,8 @@ void get_chip_IDinfo(void)
     snprintf(send_topic, sizeof(send_topic), "rfid/%s", chip_id_str);
     snprintf(lwt_content, sizeof(lwt_content), "%s", chip_id_str);//遗嘱消息设备id号
 
-
 }
 
-// // 解析配置字符串
-// static void parse_config_line(const char *line) {
-//     char buf[256];
-//     strncpy(buf, line, sizeof(buf) - 1);
-//     buf[sizeof(buf) - 1] = '\0';
-
-//     char *token = strtok(buf + 1, ";");
-//     while (token) {
-//         if (strncmp(token, "4G=", 3) == 0) {
-//             g_config.enable_4g = (token[3] == '1');
-//         } else if (strncmp(token, "ETH=", 4) == 0) {
-//             g_config.enable_eth = (token[4] == '1');
-//         } else if (strncmp(token, "LORA=", 5) == 0) {
-//             g_config.enable_lora = (token[5] == '1');
-//         } else if (strncmp(token, "WIFI=", 5) == 0) {
-//             char *ssid_start = token + 5;
-//             char *comma = strchr(ssid_start, ',');
-//             if (comma) {
-//                 *comma = '\0';
-//                 strncpy(g_config.wifi_ssid, ssid_start, sizeof(g_config.wifi_ssid) - 1);
-//                 strncpy(g_config.wifi_psd, comma + 1, sizeof(g_config.wifi_psd) - 1);
-//             }
-//         } else if (strncmp(token, "TYPE=", 5) == 0) {
-//             strncpy(g_config.label_mode, token + 5, sizeof(g_config.label_mode) - 1);
-//         }
-//         token = strtok(NULL, ";");
-//     }
-
-//     ESP_LOGI(TAG, "Parsed Config: 4G=%d, ETH=%d, LORA=%d, SSID=%s, PSD=%s, TYPE=%s",
-//              g_config.enable_4g, g_config.enable_eth, g_config.enable_lora,
-//              g_config.wifi_ssid, g_config.wifi_psd, g_config.label_mode);
-// }
 // 解析配置字符串
 static void parse_config_line(const char *line)
 {

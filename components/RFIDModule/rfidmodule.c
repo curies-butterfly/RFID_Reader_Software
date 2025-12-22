@@ -8,6 +8,8 @@
 #include <math.h>
 #include "dev_info.h"
 
+#include "freertos/timers.h"
+
 static const char *TAG = "RFID_Del";
 
 BaseDataFrame_t  UARTRecvFrame;
@@ -16,6 +18,14 @@ uint16_t    epcCnt = 0;
 uint16_t    epc_read_speed = 0;
 uint8_t frameDealFlag = 0;         //帧处理flag,当为 1 时表示成接收了一帧数据,
                                    //当为 2 时表示成功接收并处理了一帧数据(CRC校验成功) ,处理好的数据放在UARTRecvFrame
+
+static TimerHandle_t s_rfid_watch_timer = NULL;
+static uint16_t s_last_epc_speed = 0;
+static uint8_t s_stagnant_cnt = 0;
+static volatile uint8_t s_need_continuous = 0;
+static uint32_t s_last_switch_ticks = 0;
+
+
 
 char *FreqTab[40] = {"国标 920~925MHz","国标 840~845MHz","国标 840~845MHz 和 920~925MHz",\
                    "FCC,902~928MHz","ETSI, 866~868MHz","JP, 916.8~920.4 MHz",\
@@ -774,6 +784,28 @@ void RFID_ReadEpcTask(void *arg)
             free(EPCFrame.pData);
         }
 
+        // if (s_need_continuous) {//长时间没有更新，就把rfid打开
+        //     s_need_continuous = 0;
+        //     ESP_LOGW("RFID_ReadEpcTask", "No data for a long time, restart RFID reading!!!!!");
+        //     ctrl_rfid_mode(2);
+        // }
+
+
+     
+        if (s_need_continuous) {
+            s_need_continuous = 0;
+            TickType_t now = xTaskGetTickCount();
+            ESP_LOGW("RFID_ReadEpcTask", "Checking for long no data condition...");
+            if ( (now - s_last_switch_ticks) >= pdMS_TO_TICKS(60000)) {
+                ESP_LOGW("RFID_ReadEpcTask", "No data for a long time, restart RFID reading!!!!!");
+                ctrl_rfid_mode(2);
+                s_last_switch_ticks = now;
+            }
+        }
+
+
+
+
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
@@ -788,7 +820,7 @@ void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr)
     for (int index = 0; index < 120; index++) {
         if (frame->pData[2] == 0 && frame->pData[3] == 0) break;
 
-        if (LTU3_Lable[index] == NULL) {
+        if (LTU3_Lable[index] == NULL) {//历史标签中不存在新的id号
             epcCnt++;
             LTU3_Lable[index] = (EPC_Info_t *)malloc(sizeof(EPC_Info_t));
             if (LTU3_Lable[index] == NULL) return;
@@ -799,6 +831,8 @@ void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr)
             LTU3_Lable[index]->rssi = frame->pData[8];
             int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             float temp = raw_temp / 100.0f;
+
+            if(temp<-10.00 || temp>101.00) break;
 
             LTU3_Lable[index]->tempe = raw_temp;
             LTU3_Lable[index]->last_temp = temp;
@@ -811,10 +845,12 @@ void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr)
         }
 
         if (LTU3_Lable[index]->epcId[0] == frame->pData[2] &&
-            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {
+            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {//历史已有标签id号
 
             int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             float new_temp = raw_temp / 100.0f;
+            if (new_temp<-10.00 || new_temp>101.00) break;
+
             float old_temp = LTU3_Lable[index]->filtered_tempe;
             LTU3_Lable[index]->last_temp = old_temp;
 
@@ -853,7 +889,7 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
     for (int index = 0; index < 120; index++) {
         if (frame->pData[2] == 0 && frame->pData[3] == 0) break;
 
-        if (LTU3_Lable[index] == NULL) {
+        if (LTU3_Lable[index] == NULL) {//历史标签中不存在新的id号
             epcCnt++;
             LTU3_Lable[index] = (EPC_Info_t *)malloc(sizeof(EPC_Info_t));
             if (LTU3_Lable[index] == NULL) return;
@@ -869,8 +905,8 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
 
             double temperature = calculate_temperature(adc, cali);   
             
-            if (temperature<-10.00) break;
-            
+            // if (temperature<-10.00) break;
+            if (temperature < -10.00 || temperature > 101.00) break;
             // printf("temp:%0.2f\n",temperature);
             // int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             float temp = temperature;
@@ -886,7 +922,7 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
         }
 
         if (LTU3_Lable[index]->epcId[0] == frame->pData[2] &&
-            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {
+            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {//历史已有标签id号
 
             // int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             uint16_t adc = ((frame->pData[4]<<8) | frame->pData[5]);    // ADC 原始值
@@ -898,7 +934,8 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
             double temperature = calculate_temperature(adc, cali);  
             // printf("temp:%0.2f\n",temperature);
             
-            if (temperature<-10.00) break;
+            // if (temperature<-10.00) break;
+            if (temperature < -10.00 || temperature > 101.00) break;
 
             float new_temp = temperature;
             float old_temp = LTU3_Lable[index]->filtered_tempe;
@@ -957,6 +994,22 @@ TagType get_tag_type(uint8_t *data, uint16_t dataLen) {
 }
 
 
+static void rfid_watch_cb(TimerHandle_t xTimer)
+{
+    uint16_t now = epc_read_speed;
+    if (now == s_last_epc_speed) {
+        if (++s_stagnant_cnt >= 3) {
+            s_need_continuous = 1;
+            s_stagnant_cnt = 0;
+        }
+    } else {
+        s_stagnant_cnt = 0;
+    }
+    s_last_epc_speed = now;
+}
+
+
+
 // RFID 模组初始化，显示和配置相关参数
 void rfidModuleInit()
 {
@@ -1008,6 +1061,15 @@ void rfidModuleInit()
     if (g_config.epcbb_type[0] != '\0') { 
         RFID_SendCmdConfigEpcBaseband(); //配置基带信息指令
     }
+
+    if (s_rfid_watch_timer == NULL) {
+        s_last_epc_speed = epc_read_speed;
+        s_rfid_watch_timer = xTimerCreate("rfid_watch", pdMS_TO_TICKS(5000), pdTRUE, NULL, rfid_watch_cb);
+        if (s_rfid_watch_timer) {
+            xTimerStart(s_rfid_watch_timer, 0);
+        }
+    }
+
  
 }
 
