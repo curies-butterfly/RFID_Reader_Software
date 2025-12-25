@@ -142,11 +142,11 @@ void RFID_SendBaseFrame(BaseDataFrame_t BaseDataFrame)
 
     // ESP_LOGE("EPC_READ!!!:%x",(char*)SendBuff);
      // 打印SendBuff内容
-    //  printf("SendBuff Content (Hex):!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ");
-    //  for(int i = 0; i < index; i++) {
-    //      printf("%02X ", SendBuff[i]);  // 以16进制格式打印每个字节
-    //  }
-    //  printf("\n");
+    // printf("SendBuff Content (Hex):!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ");
+    // for(int i = 0; i < index; i++) {
+    //     printf("%02X ", SendBuff[i]);  // 以16进制格式打印每个字节
+    // }
+
     RFID_SendBytes((char*)SendBuff,(size_t)index);
     free(SendBuff); 
 }
@@ -1119,6 +1119,7 @@ void ctrl_rfid_mode(uint8_t mode)
 void RFID_SendCmdConfigEpcBaseband(void)
 {
     BaseDataFrame_t frame;
+    size_t params_len = 0;
     /* 定义EPC基带配置参数数组 */
     uint8_t params_n604[8] = {0x01,0x01,0x02,0x04,0x03,0x02,0x04,0x02};//模组N604
     uint8_t params_n704[8] = {0x01,0x02,0x02,0x04,0x03,0x02,0x04,0x02};//模组N704
@@ -1126,8 +1127,15 @@ void RFID_SendCmdConfigEpcBaseband(void)
     const char *RFID_bb_type = g_config.epcbb_type;
     if (RFID_bb_type[0] == '\0') return;
     uint8_t *params = NULL;
-    if (strncmp(RFID_bb_type, "N604", 4) == 0) params = params_n604;
-    else if (strncmp(RFID_bb_type, "N704", 4) == 0) params = params_n704;
+    if (strncmp(RFID_bb_type, "N604", 4) == 0) 
+    {
+        params_len = sizeof(params_n604);
+        params = params_n604;
+    }
+    else if (strncmp(RFID_bb_type, "N704", 4) == 0){
+        params_len = sizeof(params_n704);
+        params = params_n704;
+    } 
     else return;
     ESP_LOGI(TAG, "epcbb_type set @:%s", RFID_bb_type);
     //根据数据手册里的协议 
@@ -1156,9 +1164,9 @@ void RFID_SendCmdConfigEpcBaseband(void)
     frame.ProCtrl[1] = 0x01;
     frame.ProCtrl[2] = 0x02;
     frame.ProCtrl[3] = 0x0B;
-    frame.DevAddr   = 0x00;
-    frame.DataLen   = sizeof(params);
-    frame.pData     = params;
+    frame.DevAddr    = 0x00;
+    frame.DataLen    = params_len;
+    frame.pData      = params;
 
     /* 清除接收标志并发送基础帧 */
     ClearRecvFlag();

@@ -103,9 +103,9 @@ void app_main(void)
     rfid_http_init(s_modem_wifi_config);
 
     uart1_Init();
-
+    moduleSetGpioInit();//双刀双掷模拟开关选通引脚使能
     // uart2_Init();
-    // moduleSetGpioInit();
+   
     // // iic_init();
     // modBusRtu_Init();
 
