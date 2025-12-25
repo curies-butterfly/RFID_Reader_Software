@@ -6,6 +6,9 @@
 #include <stdbool.h>
 #include "rfidnetwork.h"
 #include <math.h>
+#include "dev_info.h"
+
+#include "freertos/timers.h"
 
 static const char *TAG = "RFID_Del";
 
@@ -15,6 +18,14 @@ uint16_t    epcCnt = 0;
 uint16_t    epc_read_speed = 0;
 uint8_t frameDealFlag = 0;         //帧处理flag,当为 1 时表示成接收了一帧数据,
                                    //当为 2 时表示成功接收并处理了一帧数据(CRC校验成功) ,处理好的数据放在UARTRecvFrame
+
+static TimerHandle_t s_rfid_watch_timer = NULL;
+static uint16_t s_last_epc_speed = 0;
+static uint8_t s_stagnant_cnt = 0;
+static volatile uint8_t s_need_continuous = 0;
+static uint32_t s_last_switch_ticks = 0;
+
+
 
 char *FreqTab[40] = {"国标 920~925MHz","国标 840~845MHz","国标 840~845MHz 和 920~925MHz",\
                    "FCC,902~928MHz","ETSI, 866~868MHz","JP, 916.8~920.4 MHz",\
@@ -36,7 +47,15 @@ rfid_read_config_t rfid_read_config = {
 };
 
 #define EXAMPLE_ESP_Label_Mode      CONFIG_Label_Mode
+
 uint8_t type_epc;
+Dictionary DicPower1;
+CapacityInfo_t CapacityInfo;
+WorkFreq_t WorkFreq;
+uint8_t freaRang = 0;
+PoweInfo_t PoweInfo;
+result_t rfidready_flag; // rfid初始化标志位
+
 /*****************************************************
 函数名称：void ClearRecvFlag()
 函数功能：清除接收标志
@@ -123,11 +142,11 @@ void RFID_SendBaseFrame(BaseDataFrame_t BaseDataFrame)
 
     // ESP_LOGE("EPC_READ!!!:%x",(char*)SendBuff);
      // 打印SendBuff内容
-    //  printf("SendBuff Content (Hex):!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ");
-    //  for(int i = 0; i < index; i++) {
-    //      printf("%02X ", SendBuff[i]);  // 以16进制格式打印每个字节
-    //  }
-    //  printf("\n");
+    // printf("SendBuff Content (Hex):!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ");
+    // for(int i = 0; i < index; i++) {
+    //     printf("%02X ", SendBuff[i]);  // 以16进制格式打印每个字节
+    // }
+
     RFID_SendBytes((char*)SendBuff,(size_t)index);
     free(SendBuff); 
 }
@@ -765,6 +784,28 @@ void RFID_ReadEpcTask(void *arg)
             free(EPCFrame.pData);
         }
 
+        // if (s_need_continuous) {//长时间没有更新，就把rfid打开
+        //     s_need_continuous = 0;
+        //     ESP_LOGW("RFID_ReadEpcTask", "No data for a long time, restart RFID reading!!!!!");
+        //     ctrl_rfid_mode(2);
+        // }
+
+
+     
+        if (s_need_continuous) {
+            s_need_continuous = 0;
+            TickType_t now = xTaskGetTickCount();
+            ESP_LOGW("RFID_ReadEpcTask", "Checking for long no data condition...");
+            if ( (now - s_last_switch_ticks) >= pdMS_TO_TICKS(60000)) {
+                ESP_LOGW("RFID_ReadEpcTask", "No data for a long time, restart RFID reading!!!!!");
+                ctrl_rfid_mode(2);
+                s_last_switch_ticks = now;
+            }
+        }
+
+
+
+
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
 }
@@ -779,7 +820,7 @@ void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr)
     for (int index = 0; index < 120; index++) {
         if (frame->pData[2] == 0 && frame->pData[3] == 0) break;
 
-        if (LTU3_Lable[index] == NULL) {
+        if (LTU3_Lable[index] == NULL) {//历史标签中不存在新的id号
             epcCnt++;
             LTU3_Lable[index] = (EPC_Info_t *)malloc(sizeof(EPC_Info_t));
             if (LTU3_Lable[index] == NULL) return;
@@ -790,6 +831,8 @@ void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr)
             LTU3_Lable[index]->rssi = frame->pData[8];
             int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             float temp = raw_temp / 100.0f;
+
+            if(temp<-10.00 || temp>101.00) break;
 
             LTU3_Lable[index]->tempe = raw_temp;
             LTU3_Lable[index]->last_temp = temp;
@@ -802,10 +845,12 @@ void handle_tag_yh(BaseDataFrame_t *frame, bool *flag_ptr)
         }
 
         if (LTU3_Lable[index]->epcId[0] == frame->pData[2] &&
-            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {
+            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {//历史已有标签id号
 
             int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             float new_temp = raw_temp / 100.0f;
+            if (new_temp<-10.00 || new_temp>101.00) break;
+
             float old_temp = LTU3_Lable[index]->filtered_tempe;
             LTU3_Lable[index]->last_temp = old_temp;
 
@@ -844,7 +889,7 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
     for (int index = 0; index < 120; index++) {
         if (frame->pData[2] == 0 && frame->pData[3] == 0) break;
 
-        if (LTU3_Lable[index] == NULL) {
+        if (LTU3_Lable[index] == NULL) {//历史标签中不存在新的id号
             epcCnt++;
             LTU3_Lable[index] = (EPC_Info_t *)malloc(sizeof(EPC_Info_t));
             if (LTU3_Lable[index] == NULL) return;
@@ -860,8 +905,8 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
 
             double temperature = calculate_temperature(adc, cali);   
             
-            if (temperature<-10.00) break;
-            
+            // if (temperature<-10.00) break;
+            if (temperature < -10.00 || temperature > 101.00) break;
             // printf("temp:%0.2f\n",temperature);
             // int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             float temp = temperature;
@@ -877,7 +922,7 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
         }
 
         if (LTU3_Lable[index]->epcId[0] == frame->pData[2] &&
-            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {
+            LTU3_Lable[index]->epcId[1] == frame->pData[3]) {//历史已有标签id号
 
             // int16_t raw_temp = (frame->pData[12] << 8) | frame->pData[13];
             uint16_t adc = ((frame->pData[4]<<8) | frame->pData[5]);    // ADC 原始值
@@ -889,7 +934,8 @@ void handle_tag_xy(BaseDataFrame_t *frame, bool *flag_ptr)
             double temperature = calculate_temperature(adc, cali);  
             // printf("temp:%0.2f\n",temperature);
             
-            if (temperature<-10.00) break;
+            // if (temperature<-10.00) break;
+            if (temperature < -10.00 || temperature > 101.00) break;
 
             float new_temp = temperature;
             float old_temp = LTU3_Lable[index]->filtered_tempe;
@@ -946,4 +992,196 @@ TagType get_tag_type(uint8_t *data, uint16_t dataLen) {
     }
     return TAG_TYPE_UNKNOWN;
 }
+
+
+static void rfid_watch_cb(TimerHandle_t xTimer)
+{
+    uint16_t now = epc_read_speed;
+    if (now == s_last_epc_speed) {
+        if (++s_stagnant_cnt >= 3) {
+            s_need_continuous = 1;
+            s_stagnant_cnt = 0;
+        }
+    } else {
+        s_stagnant_cnt = 0;
+    }
+    s_last_epc_speed = now;
+}
+
+
+
+// RFID 模组初始化，显示和配置相关参数
+void rfidModuleInit()
+{
+    result_t ret = Error;
+    int timeout = 3;
+    int timecnt = 0;
+    while (ret != Ok)
+    {
+        timecnt++;
+        ret = RFID_StopRead();
+        if (timecnt > timeout)
+        {
+            return;
+        }
+    }
+    DicPower1.AntennaNo = 0x01;
+    DicPower1.Power = 33;
+    RFID_SetPower(DicPower1, 0, 1);
+    DicPower1.AntennaNo = 0x02;
+    RFID_SetPower(DicPower1, 0, 1);
+    DicPower1.AntennaNo = 0x03;
+    RFID_SetPower(DicPower1, 0, 1);
+    DicPower1.AntennaNo = 0x04;
+    RFID_SetPower(DicPower1, 0, 1);
+
+    if (Ok == RFID_GetCapacity(&CapacityInfo))
+    {
+        RFID_ShowCapacityInfo(CapacityInfo);
+    }
+    else
+        printf("读写器能力查询失败\r\n");
+
+    if (Ok == RFID_GetFreqRanger(&freaRang))
+        printf("读写器RF频段:%d,%s\r\n", freaRang, FreqTab[freaRang]);
+    else
+        printf("读写器RF频段查询失败\r\n");
+
+    if (Ok == RFID_GetPower(&PoweInfo))
+        RFID_ShowPower(PoweInfo);
+    else
+        printf("读写器功率查询失败\r\n");
+
+    if (Ok != RFID_GetWorkFreq(&WorkFreq))
+        printf("读写器工作频率查询失败\r\n");
+
+    if (Ok != RFID_StopRead())
+        printf("RFID stop read error\r\n");
+
+    if (g_config.epcbb_type[0] != '\0') { 
+        RFID_SendCmdConfigEpcBaseband(); //配置基带信息指令
+    }
+
+    if (s_rfid_watch_timer == NULL) {
+        s_last_epc_speed = epc_read_speed;
+        s_rfid_watch_timer = xTimerCreate("rfid_watch", pdMS_TO_TICKS(5000), pdTRUE, NULL, rfid_watch_cb);
+        if (s_rfid_watch_timer) {
+            xTimerStart(s_rfid_watch_timer, 0);
+        }
+    }
+
+ 
+}
+
+void ctrl_rfid_mode(uint8_t mode)
+{
+    rfid_read_config_t rfid_read_config;
+
+    if (mode == 2) // 连续模式
+    {
+        rfid_read_config.rfid_read_on_off = RFID_READ_ON;            // 读写器开
+        rfid_read_config.rfid_read_mode = RFID_READ_MODE_CONTINUOUS; // 连续模式
+        rfid_read_config.ant_sel = 0x0F;                             // 00001111 ANT4 ANT3 ANT2 ANT1
+        rfid_read_config.read_interval_time = 1000;                  // 读取频率间隔
+        rfidready_flag = RFID_ReadEPC(rfid_read_config);
+    }
+    else if (mode == 1) // 单次模式
+    {
+        rfid_read_config.rfid_read_on_off = RFID_READ_ON;      // 读写器开
+        rfid_read_config.rfid_read_mode = RFID_READ_MODE_ONCE; // 单次模式
+        rfid_read_config.ant_sel = 0x0F;                       // 00001111 ANT4 ANT3 ANT2 ANT1
+        rfid_read_config.read_interval_time = 1000;            // 读取频率间隔
+        rfidready_flag = RFID_ReadEPC(rfid_read_config);
+    }
+    else
+    {
+       while( RFID_StopRead()){
+        printf("RFID stop read error\r\n");
+        vTaskDelay(2000/portTICK_PERIOD_MS);
+       }
+      
+    }
+}
+
+
+/**
+ * @brief 发送RFID配置EPC基带命令
+ * 
+ * 该函数用于向RFID设备发送配置EPC基带参数的命令，并等待设备响应。
+ * 配置参数包括基带通信的相关设置。
+ * 
+ * @param 无
+ * 
+ * @return 无
+ * 
+ * @note 该函数会清除接收标志，发送配置帧，然后等待并解析设备响应
+ */
+void RFID_SendCmdConfigEpcBaseband(void)
+{
+    BaseDataFrame_t frame;
+    size_t params_len = 0;
+    /* 定义EPC基带配置参数数组 */
+    uint8_t params_n604[8] = {0x01,0x01,0x02,0x04,0x03,0x02,0x04,0x02};//模组N604
+    uint8_t params_n704[8] = {0x01,0x02,0x02,0x04,0x03,0x02,0x04,0x02};//模组N704
+
+    const char *RFID_bb_type = g_config.epcbb_type;
+    if (RFID_bb_type[0] == '\0') return;
+    uint8_t *params = NULL;
+    if (strncmp(RFID_bb_type, "N604", 4) == 0) 
+    {
+        params_len = sizeof(params_n604);
+        params = params_n604;
+    }
+    else if (strncmp(RFID_bb_type, "N704", 4) == 0){
+        params_len = sizeof(params_n704);
+        params = params_n704;
+    } 
+    else return;
+    ESP_LOGI(TAG, "epcbb_type set @:%s", RFID_bb_type);
+    //根据数据手册里的协议 
+    
+    /*
+    注意：模组N604 基带速率设置为1； 模组N704在识别星沿标签时需要将基带速率设置成0或者2
+    *帧头：5A
+    *协议控制字：00 01 02 0B
+    *帧长度：00 08
+    *数据参数：01 01 02 04 03 02 04 02
+        参数1：0x01，参数名称:EPC 基带速率
+        参数2：0x01，表示设置 Tari=25us,Miller4,LHF=250KHz（密集模式）
+        参数3：0x02，参数名称:默认 Q 值
+        参数4：0x04，表示设置 Q值为4
+        参数5：0x03，参数名称:Session
+        参数6：0x02，表示设置 Session2
+        参数7：0x04，参数名称:盘存标志参数
+        参数8：0x02，表示设置 Flag A+B 双面盘存
+    *CRC 校验码：9C 7E
+    */
+
+
+
+    /* 构造协议控制字节 */
+    frame.ProCtrl[0] = 0x00;
+    frame.ProCtrl[1] = 0x01;
+    frame.ProCtrl[2] = 0x02;
+    frame.ProCtrl[3] = 0x0B;
+    frame.DevAddr    = 0x00;
+    frame.DataLen    = params_len;
+    frame.pData      = params;
+
+    /* 清除接收标志并发送基础帧 */
+    ClearRecvFlag();
+    RFID_SendBaseFrame(frame);
+
+    /* 等待响应并处理结果 */
+    if (WaitFlag(20) == Ok) {
+        if (UARTRecvFrame.ProCtrl[3] == 0x0B && UARTRecvFrame.pData[0] == 0x00) {
+            printf("EPC baseband config: ok\r\n");
+        } else {
+            printf("EPC baseband config: failed, code=0x%02X\r\n", UARTRecvFrame.pData[0]);
+        }
+    } else {
+        printf("EPC baseband config: timeout\r\n");
+    }
+}
+
 

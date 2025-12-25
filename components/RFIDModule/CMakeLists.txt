@@ -6,4 +6,5 @@ idf_component_register(
     SRCS ${bsp_src}
     INCLUDE_DIRS
         "."
-    REQUIRES ${requires})
+    REQUIRES ${requires}
+)

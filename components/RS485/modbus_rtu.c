@@ -516,89 +516,37 @@ void modbusRtushow_Task(void *arg)
 
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }
-
-    // modBusRtuCmdFrame_t modBusRtuCmdFrame_task; 
-    // static const char *RFID_DTU_DEAL_TAG = "RFID_DTU_DEAL_TAG";
-    // char *testdata = "abcpqrstuvwxyzABCDEF";//defghijklmnoHIJKLMG
-
-    // // uint8_t sendbuf[200];
-    // uint8_t sendtemp_test[]={0x6D,0x61,0x69,0x6E,0x2E,0x78,0x30,0x2E,0x76,0x61,0x6c,0x3D,0x31,0x30,0x30,0xFF,0xFF,0xFF};
-    // uint8_t sendbuf2[50];
-    // char  one_epc_data[50] = {'\0'};
-    // // char sendbuf[200];
-    // while(1)
-    // {
-    //     uint8_t index = 0;
-    //     if(xSemaphoreTake(xBinarySemaphore, portMAX_DELAY)!= pdTRUE)
-    //         continue;
-        
-    //     EPC_Info_t  **EPC_ptr = &LTU3_Lable;
-    //     char epc485sendid[18];//id+temp
-
-    //     for(int i = 0; i < 120; i++)
-    //     {
-    //         if(EPC_ptr[i] == NULL)
-    //             break;
-    //         memset(epc485sendid,0,sizeof(epc485sendid));
-    //         switch (EPC_ptr[i]->antID)
-    //         {
-    //             case 1:
-    //                 /* code */
-    //                 snprintf(epc485sendid, sizeof(epc485sendid),"ID:%02x%02x temp:%2.1f", EPC_ptr[i]->epcId[0],EPC_ptr[i]->epcId[1],EPC_ptr[i]->tempe/100.0);
-    //                 // printf("id:%s\n",epc485sendid);
-    //                 showEPC(epc485sendid);
-    //                 // uart2_SendStr((char*)"\r\n"); 
-    //                 // uart2_SendStr((char*)sendtemp_test);
-
-    //                 break;
-    //             case 2:
-    //                 /* code */
-    //                 break;
-    //             case 3:
-    //                 /* code */
-    //                 break;
-    //             case 4:
-    //                 /* code */
-    //                 break;
-    //             default:
-    //                 break;
-    //         }           
-    //     }
-     
-    //     vTaskDelay(200/portTICK_PERIOD_MS);
-    // }
-
 }
 
 
-void showEPC(const char* str,uint8_t point) {
-    uint8_t sendbuf1[] = {0x70, 0x61, 0x67, 0x65, 0x30, 0x2E, 0x74, 0x31, 0x2E, 0x74, 0x78, 0x74, 0x3D, 0x22};
-    //                      p     a     g     e     0     .     t     1     .     t     x     t     =     "
-    sendbuf1[7]=point;
-    unsigned char hexArray[1024] = {0};  // 增加大小以避免溢出
-    int length = strlen(str);          
-    // printf("%d\n", length);
-    for (int i = 0; i < length; i++) {
-        hexArray[i] = (unsigned char)str[i];
-    }
-    hexArray[length++] = 0x22;  // 添加 0x22 (引号)
-    hexArray[length++] = 0xFF;  // 添加 0xFF
-    hexArray[length++] = 0xFF;  // 再添加 0xFF
-    hexArray[length++] = 0xFF;  // 0xFF 
-    hexArray[length++] = 0x00;  // 
-    // 计算新数组的总长度
-    int sendbuf1_len = sizeof(sendbuf1); // sendbuf1 的长度
-    int hexArray_len = length;       // hexArray 的长度
-    int total_len = sendbuf1_len + hexArray_len;
-    // 创建新数组以存储合并后的数据
-    unsigned char combinedArray[total_len];
-    // 复制 sendbuf1 到新数组
-    memcpy(combinedArray, sendbuf1, sendbuf1_len);
-    // 复制 hexArray 到新数组
-    memcpy(combinedArray + sendbuf1_len, hexArray, hexArray_len);
-    // 发送合并后的数组
-    uart2_SendStr((char*)combinedArray);
+// void showEPC(const char* str,uint8_t point) {
+//     uint8_t sendbuf1[] = {0x70, 0x61, 0x67, 0x65, 0x30, 0x2E, 0x74, 0x31, 0x2E, 0x74, 0x78, 0x74, 0x3D, 0x22};
+//     //                      p     a     g     e     0     .     t     1     .     t     x     t     =     "
+//     sendbuf1[7]=point;
+//     unsigned char hexArray[1024] = {0};  // 增加大小以避免溢出
+//     int length = strlen(str);          
+//     // printf("%d\n", length);
+//     for (int i = 0; i < length; i++) {
+//         hexArray[i] = (unsigned char)str[i];
+//     }
+//     hexArray[length++] = 0x22;  // 添加 0x22 (引号)
+//     hexArray[length++] = 0xFF;  // 添加 0xFF
+//     hexArray[length++] = 0xFF;  // 再添加 0xFF
+//     hexArray[length++] = 0xFF;  // 0xFF 
+//     hexArray[length++] = 0x00;  // 
+//     // 计算新数组的总长度
+//     int sendbuf1_len = sizeof(sendbuf1); // sendbuf1 的长度
+//     int hexArray_len = length;       // hexArray 的长度
+//     int total_len = sendbuf1_len + hexArray_len;
+//     // 创建新数组以存储合并后的数据
+//     unsigned char combinedArray[total_len];
+//     // 复制 sendbuf1 到新数组
+//     memcpy(combinedArray, sendbuf1, sendbuf1_len);
+//     // 复制 hexArray 到新数组
+//     memcpy(combinedArray + sendbuf1_len, hexArray, hexArray_len);
+//     // 发送合并后的数组
+//     uart2_SendStr((char*)combinedArray);
 
-}
+// }
 
 

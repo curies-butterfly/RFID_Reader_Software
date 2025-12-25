@@ -41,6 +41,8 @@ void _led_indicator_init()
         led_indicator_stop(s_led_net_status_handle, BLINK_CONNECTED);
         led_indicator_start(s_led_net_status_handle, BLINK_CONNECTING);
     }
+
+
 }
 
 
@@ -60,3 +62,8 @@ void fan_gpio_set(bool on)
 {
     gpio_set_level(FAN_GPIO, on ? 1 : 0);
 }
+
+
+
+
+

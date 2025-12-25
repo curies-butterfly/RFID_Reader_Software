@@ -86,12 +86,17 @@
         "typeinfo": "c",
         "cstdio": "c",
         "cmath": "c",
-        "usbh_modem_board.h": "c"
+        "usbh_modem_board.h": "c",
+        "datadeal.h": "c",
+        "data_deal.h": "c",
+        "sc16is752.h": "c",
+        "app_tasks.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "idf.portWin": "COM54",
     "C_Cpp.dimInactiveRegions": false,
     "editor.fontSize": 25,
-    "idf.pythonInstallPath": "/home/hjie/.espressif/python_env/idf5.2_py3.10_env/bin/python",
-    "idf.flashType": "UART"
+    "idf.pythonInstallPath": "D:\\Espressif\\tools\\idf-python\\3.11.2\\python.exe",
+    "idf.flashType": "UART",
+    "idf.currentSetup": "/home/hjie/esp/esp-idf"
 }

@@ -1,6 +1,6 @@
-set(bsp_src "sht30.c")
+set(bsp_src "sc16is752.c")
 
-set(requires "driver" "SHT30")
+set(requires "driver")
 
 idf_component_register(
     SRCS ${bsp_src}

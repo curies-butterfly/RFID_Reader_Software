@@ -21,7 +21,7 @@
 #include "parameter.h"
 #include <time.h>
 #include <sys/time.h>
-#include "sht30.h"
+// #include "sht30.h"
 #include "rfidmodule.h"
 
 #define debug_flag 1
@@ -891,9 +891,12 @@ static esp_err_t sys_sta_get_handler(httpd_req_t *req)
     uint8_t err_code = 0x11;
     char *json_str = NULL;
     size_t size = 0;
-    size = asprintf(&json_str,
-                "{\"status\":\"200\", \"time\":\"%lld\",\"err_code\":\"%x\", \"tempt\":\"%.2f\",\"humt\":\"%.2f\"}",
-                    now_time, err_code, sht30_data.Temperature, sht30_data.Humidity);
+    // size = asprintf(&json_str,
+    //             "{\"status\":\"200\", \"time\":\"%lld\",\"err_code\":\"%x\", \"tempt\":\"%.2f\",\"humt\":\"%.2f\"}",
+    //                 now_time, err_code, sht30_data.Temperature, sht30_data.Humidity);
+     size = asprintf(&json_str,
+                "{\"status\":\"200\", \"time\":\"%lld\",\"err_code\":\"%x\"}",
+                    now_time, err_code);
     /**
      * @brief Set the HTTP status code
      */

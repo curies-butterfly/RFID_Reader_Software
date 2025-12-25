@@ -16,7 +16,13 @@ typedef struct at_device_tp1107 {
     at_response_t at_resp;
     at_client_t client;  // 添加client成员
     void *user_data;
+    uint8_t net_comm_ok;
+    uint8_t net_err;
+    int     last_err_code;
+    at_response_t at_resp_long;
 } at_device_tp1107;
+extern at_device_tp1107 tp1107;
+
 
 
 void TP1107_Init();
@@ -27,6 +33,7 @@ int unb_tp1107_rea_init(at_device_tp1107 *unb_device, const struct at_urc urc_te
 int unb_tp1107_init(void);
 void urc_func1(struct at_client *client, const char *data, size_t  size);
 void urc_func2(struct at_client *client, const char *data, size_t  size);
+void urc_func_error(struct at_client *client, const char *data, size_t size);
 // int unb_tp1107_rea_init(at_device_tp1107 *unb_device, const struct at_urc urc_temp[]);
 
 

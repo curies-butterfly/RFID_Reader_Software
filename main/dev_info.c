@@ -28,6 +28,8 @@ config_info_t g_config = {
     .enable_lora = false,
     .wifi_ssid = "",
     .wifi_psd = "",
+    .mqtt_addr = "",
+    .epcbb_type = "",
 };
 
 void get_chip_IDinfo(void)
@@ -76,11 +78,11 @@ void get_chip_IDinfo(void)
     snprintf(send_topic, sizeof(send_topic), "rfid/%s", chip_id_str);
     snprintf(lwt_content, sizeof(lwt_content), "%s", chip_id_str);//遗嘱消息设备id号
 
-
 }
 
 // 解析配置字符串
-static void parse_config_line(const char *line) {
+static void parse_config_line(const char *line)
+{
     char buf[256];
     strncpy(buf, line, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
@@ -89,11 +91,14 @@ static void parse_config_line(const char *line) {
     while (token) {
         if (strncmp(token, "4G=", 3) == 0) {
             g_config.enable_4g = (token[3] == '1');
-        } else if (strncmp(token, "ETH=", 4) == 0) {
+        } 
+        else if (strncmp(token, "ETH=", 4) == 0) {
             g_config.enable_eth = (token[4] == '1');
-        } else if (strncmp(token, "LORA=", 5) == 0) {
+        } 
+        else if (strncmp(token, "LORA=", 5) == 0) {
             g_config.enable_lora = (token[5] == '1');
-        } else if (strncmp(token, "WIFI=", 5) == 0) {
+        } 
+        else if (strncmp(token, "WIFI=", 5) == 0) {
             char *ssid_start = token + 5;
             char *comma = strchr(ssid_start, ',');
             if (comma) {
@@ -101,17 +106,32 @@ static void parse_config_line(const char *line) {
                 strncpy(g_config.wifi_ssid, ssid_start, sizeof(g_config.wifi_ssid) - 1);
                 strncpy(g_config.wifi_psd, comma + 1, sizeof(g_config.wifi_psd) - 1);
             }
-        } else if (strncmp(token, "TYPE=", 5) == 0) {
+        } 
+        else if (strncmp(token, "TYPE=", 5) == 0) {
             strncpy(g_config.label_mode, token + 5, sizeof(g_config.label_mode) - 1);
+        } 
+        else if (strncmp(token, "MQTT=", 5) == 0) {
+            strncpy(g_config.mqtt_addr, token + 5, sizeof(g_config.mqtt_addr) - 1);
+        }
+        else if (strncmp(token, "EPCBB_TYPE=", 11) == 0) {
+            memset(g_config.epcbb_type, 0, sizeof(g_config.epcbb_type));
+            strncpy(g_config.epcbb_type, token + 11, sizeof(g_config.epcbb_type) - 1);
         }
         token = strtok(NULL, ";");
     }
 
-    ESP_LOGI(TAG, "Parsed Config: 4G=%d, ETH=%d, LORA=%d, SSID=%s, PSD=%s, TYPE=%s",
-             g_config.enable_4g, g_config.enable_eth, g_config.enable_lora,
-             g_config.wifi_ssid, g_config.wifi_psd, g_config.label_mode);
+    ESP_LOGI(TAG,
+             "Parsed Config: 4G=%d, ETH=%d, LORA=%d, SSID=%s, PSD=%s, TYPE=%s, MQTT=%s, EPCBB_TYPE=%s",
+             g_config.enable_4g,
+             g_config.enable_eth,
+             g_config.enable_lora,
+             g_config.wifi_ssid,
+             g_config.wifi_psd,
+             g_config.label_mode,
+             g_config.mqtt_addr,
+             g_config.epcbb_type
+            );
 }
-
 
 static void set_nvs_LabelType(const char *label_mode_str){
     if (strcmp(label_mode_str, "YH") != 0 && strcmp(label_mode_str, "XY") != 0) {
@@ -165,6 +185,25 @@ static void set_nvs_wifista(const char *ssid, const char *pswd)
     ESP_LOGI(TAG, "WiFi STA configuration saved: SSID = %s,PSWD = %s", ssid, pswd);
 }
 
+// 保存MQTT地址到NVS(用于串口写入)
+static void set_nvs_mqtt(const char *mqtt_addr)
+{
+    if (mqtt_addr == NULL || strlen(mqtt_addr) == 0) {
+        ESP_LOGE(TAG, "Invalid MQTT address.");
+        return;
+    }
+
+    esp_err_t err = from_nvs_set_value("mqtt_addr", mqtt_addr);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "MQTT address saved: %s", mqtt_addr);
+    } else {
+        ESP_LOGE(TAG, "Failed to save MQTT address: %s", esp_err_to_name(err));
+    }
+}
+
+
+
+
 // 串口0配置信息
 void wait_for_config_or_timeout(void) {
     uart_config_t uart_config = {
@@ -200,6 +239,7 @@ void wait_for_config_or_timeout(void) {
                 set_nvs_LabelType(g_config.label_mode);//设置读取的标签类型
                 set_nvs_netSel(g_config.enable_4g, g_config.enable_eth, g_config.enable_lora);//设置三种上网模式
                 set_nvs_wifista(g_config.wifi_ssid,g_config.wifi_psd);//设置wifi sta ssid psd
+                set_nvs_mqtt(g_config.mqtt_addr);
                 // save_config_to_nvs();
 
                 return; // 正常接收后直接返回
