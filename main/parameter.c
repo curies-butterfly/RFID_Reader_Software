@@ -152,101 +152,122 @@ esp_err_t get_nvs_auth_info_config(void)
 
 esp_err_t get_nvs_sys_info_config(void)
 {
-    char str[64] = "";
-    size_t str_size = sizeof(str);
     esp_err_t err;
+    size_t str_size;
 
+    /* 使用最大字段作为临时 buffer */
+    char str[sizeof(sys_info_config.mqtt_address)] = {0};
+
+    /* ---------- work mode ---------- */
+    str_size = sizeof(str);
     err = from_nvs_get_value("w_mod", str, &str_size);
-    if ( err == ESP_OK ) {
-        if ( !strcmp(str, "rfid reader") ) {
+    if (err == ESP_OK) {
+        if (!strcmp(str, "rfid reader")) {
             sys_info_config.sys_work_mode = SYS_WORK_MODE_READER;
-        } else if ( !strcmp(str, "gateway") ) {
+        } else if (!strcmp(str, "gateway")) {
             sys_info_config.sys_work_mode = SYS_WORK_MODE_GATEWAY;
         } else {
-            ESP_LOGE(TAG, "system work mode %s is not define", str);
+            ESP_LOGE(TAG, "system work mode %s is not defined", str);
         }
     }
+
+    /* ---------- networking mode ---------- */
     str_size = sizeof(str);
     err = from_nvs_get_value("net_sel", str, &str_size);
-    if ( err == ESP_OK ) {
-        if ( !strcmp(str, "4G") ) {
+    if (err == ESP_OK) {
+        if (!strcmp(str, "4G")) {
             sys_info_config.sys_networking_mode = SYS_NETWORKING_4G;
-        } else if ( !strcmp(str, "ethernet") ) {
+        } else if (!strcmp(str, "ethernet")) {
             sys_info_config.sys_networking_mode = SYS_NETWORKING_ETHERNET;
-        } else if ( !strcmp(str, "lora") ) {
+        } else if (!strcmp(str, "lora")) {
             sys_info_config.sys_networking_mode = SYS_NETWORKING_UNB;
-        }else {
-            ESP_LOGE(TAG, "system networking mode %s is not define", str);
+        } else if (!strcmp(str, "wifi")) {
+            sys_info_config.sys_networking_mode = SYS_NETWORKING_WIFI;
+        } else {
+            ESP_LOGE(TAG, "system networking mode %s is not defined", str);
         }
     }
+
+    /* ---------- communication protocol ---------- */
     str_size = sizeof(str);
     err = from_nvs_get_value("ncp_sel", str, &str_size);
-    if ( err == ESP_OK ) {
-        if ( !strcmp(str, "mqtt") ) {
-            sys_info_config.sys_net_communication_protocol = SYS_NET_COMMUNICATION_PROTOCOL_MQTT;
-        } else if ( !strcmp(str, "tcp") ) {
-            sys_info_config.sys_net_communication_protocol = SYS_NET_COMMUNICATION_PROTOCOL_TCP;
+    if (err == ESP_OK) {
+        if (!strcmp(str, "mqtt")) {
+            sys_info_config.sys_net_communication_protocol =
+                SYS_NET_COMMUNICATION_PROTOCOL_MQTT;
+        } else if (!strcmp(str, "tcp")) {
+            sys_info_config.sys_net_communication_protocol =
+                SYS_NET_COMMUNICATION_PROTOCOL_TCP;
         } else {
-            ESP_LOGE(TAG, "system communication protocol  %s is not define", str);
+            ESP_LOGE(TAG, "system communication protocol %s is not defined", str);
         }
     }
-    str_size = sizeof(str);
-    err = from_nvs_get_value("mqtt_addr", str, &str_size);
-    if ( err == ESP_OK ) {
-         memset(sys_info_config.mqtt_address, '\0', \
-        sizeof(sys_info_config.mqtt_address));
-        strncpy(sys_info_config.mqtt_address, str, str_size);
-    }
-    str_size = sizeof(str);
-    err = from_nvs_get_value("tcp_addr", str, &str_size);
-    if ( err == ESP_OK ) {
-         memset(sys_info_config.tcp_address, '\0', \
-        sizeof(sys_info_config.tcp_address));
-        strncpy(sys_info_config.tcp_address, str, str_size);
-    }
-    str_size = sizeof(str);
-    err = from_nvs_get_value("tcp_port", str, &str_size);
-    if ( err == ESP_OK ) {
-        sys_info_config.tcp_port = atoi(str);
+
+    /* ---------- MQTT address ---------- */
+    str_size = sizeof(sys_info_config.mqtt_address);
+    err = from_nvs_get_value("mqtt_addr",
+                             sys_info_config.mqtt_address,
+                             &str_size);
+    if (err != ESP_OK) {
+        sys_info_config.mqtt_address[0] = '\0';
     }
 
+    /* ---------- MQTT username ---------- */
+    str_size = sizeof(sys_info_config.mqtt_username);
+    err = from_nvs_get_value("mqtt_user",
+                             sys_info_config.mqtt_username,
+                             &str_size);
+    if (err != ESP_OK) {
+        sys_info_config.mqtt_username[0] = '\0';
+    }
 
-    
-   //设置读写标签类型 悦和 星沿
-   char label_mode_str[16] = {0};       // 当前 NVS 中的值
-   str_size = sizeof(label_mode_str);
-   err = from_nvs_get_value("label_mode", label_mode_str, &str_size);
-   if (err == ESP_OK) {
-       ESP_LOGI(TAG, "label_mode from NVS: %s", label_mode_str);
-   
-       // 根据字符串设置 type_epc
-       if (strcmp(label_mode_str, "YH") == 0) {
-           type_epc = 1;
-       } else if (strcmp(label_mode_str, "XY") == 0) {
-           type_epc = 2;
-       } else {
-           type_epc = 0;
-       }
-   
-       ESP_LOGI(TAG, "type_epc set to: %d", type_epc);
-   
-   } else {
-       ESP_LOGW(TAG, "label_mode not found, setting default to 'YH'");
-       // 如果没读到，说明不存在，写入默认值
-       err = from_nvs_set_value("label_mode", "YH");
-       if (err == ESP_OK) {
-           ESP_LOGI(TAG, "Successfully set default label_mode to: YH");
-           type_epc = 1; // 默认值设为 YH 对应的 type_epc
-       } else {
-           ESP_LOGE(TAG, "Failed to set default label_mode: %s", esp_err_to_name(err));
-           type_epc = 0;
-       }
-   }
+    /* ---------- MQTT password ---------- */
+    str_size = sizeof(sys_info_config.mqtt_password);
+    err = from_nvs_get_value("mqtt_pwd",
+                             sys_info_config.mqtt_password,
+                             &str_size);
+    if (err != ESP_OK) {
+        sys_info_config.mqtt_password[0] = '\0';
+    }
 
+    /* ---------- TCP address ---------- */
+    str_size = sizeof(sys_info_config.tcp_address);
+    err = from_nvs_get_value("tcp_addr",
+                             sys_info_config.tcp_address,
+                             &str_size);
+    if (err != ESP_OK) {
+        sys_info_config.tcp_address[0] = '\0';
+    }
 
+    /* ---------- TCP port ---------- */
+    char port_str[8] = {0};
+    str_size = sizeof(port_str);
+    err = from_nvs_get_value("tcp_port", port_str, &str_size);
+    if (err == ESP_OK) {
+        sys_info_config.tcp_port = (uint16_t)atoi(port_str);
+    }
+
+    /* ---------- label mode ---------- */
+    char label_mode_str[16] = {0};
+    str_size = sizeof(label_mode_str);
+    err = from_nvs_get_value("label_mode", label_mode_str, &str_size);
+    if (err == ESP_OK) {
+        if (!strcmp(label_mode_str, "YH")) {
+            type_epc = 1;
+        } else if (!strcmp(label_mode_str, "XY")) {
+            type_epc = 2;
+        } else {
+            type_epc = 0;
+        }
+    } else {
+        from_nvs_set_value("label_mode", "YH");
+        type_epc = 1;
+    }
 
     return ESP_OK;
 }
+
+
 
 void sys_info_config_init(sys_info_config_t *config)
 {

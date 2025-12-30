@@ -1096,6 +1096,12 @@ static esp_err_t sys_info_get_handler(httpd_req_t *req)
     case SYS_NETWORKING_ALL:
         net_sel = "4G+ethernet";
         break;
+    case SYS_NETWORKING_UNB:
+        net_sel = "unb";
+        break;
+    case SYS_NETWORKING_WIFI:
+        net_sel = "wifi";
+        break;
     default:
         net_sel = "unknown";
         break;
@@ -1282,6 +1288,10 @@ static esp_err_t sys_info_post_handler(httpd_req_t *req)
         ESP_ERROR_CHECK(from_nvs_set_value("net_sel", "ethernet"));
     else if(!strcmp(net_sel, "4G+ethernet"))
         ESP_ERROR_CHECK(from_nvs_set_value("net_sel", "4G+ethernrt"));
+    else if(!strcmp(net_sel, "wifi"))
+        ESP_ERROR_CHECK(from_nvs_set_value("net_sel", "wifi"));
+    else if(!strcmp(net_sel, "unb"))
+        ESP_ERROR_CHECK(from_nvs_set_value("net_sel", "lora"));
     else {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "parameter net_sel error");
         return ESP_FAIL;

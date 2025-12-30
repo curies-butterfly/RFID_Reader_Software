@@ -567,10 +567,14 @@ static void mqtt_app_start(void)
                         //     .password = "Cadcad431.",  // MQTT Password
                         // }
 
-                        .username = "hjie",
+                        // .username = "hjie",
+                        // .authentication = {
+                        //     .password = "129223.", // MQTT Password
+                        // }
+                        .username = sys_info_config.mqtt_username[0] ? sys_info_config.mqtt_username : NULL,
                         .authentication = {
-                            .password = "129223.", // MQTT Password
-                        }
+                            .password = sys_info_config.mqtt_password[0] ? sys_info_config.mqtt_password : NULL,
+                        },
 
         },
 
@@ -590,6 +594,9 @@ static void mqtt_app_start(void)
     /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
     esp_mqtt_client_register_event(mqtt_client, -1, mqtt_event_handler, NULL); // 注册事件处理函数
     esp_mqtt_client_start(mqtt_client);                                        // 启动MQTT客户端
+
+    // ESP_LOGW(TAG, "MQTT username: %s", sys_info_config.mqtt_username[0] ? sys_info_config.mqtt_username : "(null)");
+    // ESP_LOGW(TAG, "MQTT password: %s", sys_info_config.mqtt_password[0] ? sys_info_config.mqtt_password : "(null)");
 
     // 释放 JSON 对象，但不释放 lwt_msg，因为 MQTT 客户端需要使用它
     cJSON_Delete(lwt_json);
@@ -829,8 +836,8 @@ static void wifi_ap_sta_init(void)
 void network_init(void)
 {
     // module_4G_init();
-
-    // 2025.1.2
+    // wifi_ap_init();//热点
+    wifi_ap_sta_init(); // 配置ap+sta模式
     if (sys_info_config.sys_networking_mode == SYS_NETWORKING_4G)
     {
         module_4G_init();
@@ -846,15 +853,14 @@ void network_init(void)
         printf("=========UNB mode=========\r\n");
         unb_tp1107_init(); // tp1107初始化
     }
-    else
-    {
-        ESP_LOGI(TAG, "=========fatal err=========");
-        return;
-    }
+    // else
+    // {
+    //     ESP_LOGI(TAG, "=========fatal err=========");
+    //     return;
+    // }
     ESP_LOGI(TAG, "=========Network connected=========");
 
-    // wifi_ap_init();//热点
-    wifi_ap_sta_init(); // 配置ap+sta模式
+  
 }
 
 void mqtt_init(void)

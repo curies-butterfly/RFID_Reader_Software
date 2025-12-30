@@ -12,6 +12,6 @@ typedef struct{
 
 void publish_epc_data2();
 void loraInfoToGateway();
-
+void EPC_Json_info_to_middleware(int mode);
 
 #endif /* _DATA_DEAL_H_ */

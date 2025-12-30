@@ -80,6 +80,7 @@ void RFID_MqttTimeTask(void *arg)
         // xEventGroupWaitBits(xEventGroup, TASK_1_EVENT_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
 
         publish_epc_data2();
+      
         ESP_LOGI("Timing_Task", "Timing task sending..,and time is %d", pushtime_count);
 
         // // 完成发送后，清除事件组标志位，允许任务二执行

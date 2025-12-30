@@ -25,6 +25,7 @@ typedef enum {
     SYS_NETWORKING_ETHERNET,            /**< ethernet */
     SYS_NETWORKING_ALL,                 /**< 4G + ethernet */
     SYS_NETWORKING_UNB,                 /**< unb lora mode */
+    SYS_NETWORKING_WIFI,                /**< wifi mode */
 } sys_networking_mode_t;
 
 typedef enum {
@@ -39,7 +40,9 @@ typedef struct {
     sys_work_mode_t sys_work_mode;                              /*!< system Work mode */
     sys_networking_mode_t sys_networking_mode;                  /*!< system networking mode */
     sys_net_communication_protocol_t sys_net_communication_protocol;    /*!< system communication protocol */
-    char mqtt_address[32];                                      /*!< mqtt address */
+    char mqtt_address[128];                                      /*!< mqtt address */
+    char mqtt_username[64];
+    char mqtt_password[64];
     char tcp_address[32]; 
     uint16_t tcp_port;
 } sys_info_config_t;

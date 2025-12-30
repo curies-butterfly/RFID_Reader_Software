@@ -1,6 +1,6 @@
 # RFID Reader
 ## 环境搭建
-环境：idf版本5.2.1 +vscode + ESP-IDF 5.2 CMD
+环境：idf版本5.2.5 +vscode + ESP-IDF 5.2 CMD
 linux 环境搭建：WSL2 Ubuntu 22.04 +vscode + ESP-IDF 5.2.5 推荐这个！需安装windows子系统
 
 >windows安装WSL 📖 安装参考：https://blog.csdn.net/Natsuago/article/details/145594631
@@ -25,12 +25,13 @@ https://blog.csdn.net/orange1710/article/details/131904929
 各字段以分号;分隔，采用 KEY=VALUE 的键值对形式，具体含义如下：
 
 #### 发送数据方式
-| 参数     | 值 | 说明                  |
-| ------  | - | ------------------- |
-| `4G`   | 1 | 启用 4G 网络模块      |
-| `ETH`  | 0 | 禁用有线以太网（Ethernet）接口 |
-| `LORA` | 0 | 禁用 LoRa 通信模块     |
-注：0表示禁用，1表示启用，三种方式选一，根据用户需求
+| 参数     | 值 | 说明                            |
+| ------  | - | -------------------              |
+| `4G`   | 1 | 启用 4G 网络模块                   |
+| `ETH`  | 0 | 禁用有线以太网（Ethernet）接口      |
+| `LORA` | 0 | 禁用 LoRa 通信                     |
+| `WIFI` | 0 | 禁用 Wi-Fi 发送数据                |
+注：0表示禁用，1表示启用，四种方式选一，根据用户需求
 
 注：默认开启wifi ap+station模式
 #### 标签类型选择
@@ -45,7 +46,7 @@ https://blog.csdn.net/orange1710/article/details/131904929
 | ------ | --------------------- | ------------------------------------- |
 | `WIFI` | `self_test,147258369` | 使用的 Wi-Fi 热点名称和密码，格式为 `SSID,PASSWORD` |
 
-ap热点配置信息默认，如需更改，执行idf.py menuconfig命令
+<!-- ap热点配置信息默认，如需更改，执行idf.py menuconfig命令 -->
 
 ### 使用 Wi-Fi 热点 (AP 模式) 在网页端进行配置
 
@@ -57,7 +58,8 @@ ap热点配置信息默认，如需更改，执行idf.py menuconfig命令
 | 参数     | 值                     | 说明                                    |
 | ------ | --------------------- | ------------------------------------- |
 | `MQTT` | `mqtt://8.159.138.166` | mqtt服务地址 |
-
+| `MQTT_USER` | `ssid` | mqtt服务端连接的用户名 |
+| `MQTT_PWD` | `pwd` | mqtt服务端连接的密码 |
 
 
 ### EPCBB_TYPE
